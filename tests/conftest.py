@@ -36,6 +36,8 @@ def global_mocks():
         resp.status_code = 200
         resp.json.return_value = {"token": "t"}
         h_client.post.return_value = resp
+        h_client.put.return_value = resp
+        h_client.delete.return_value = resp
         
         # requests setup
         r_resp = MagicMock()

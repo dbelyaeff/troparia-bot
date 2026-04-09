@@ -231,21 +231,30 @@ async def max_webhook(request: Request, x_max_bot_api_secret: str = Header(None)
             
     elif update_type == "message_callback":
         cb = update.get("callback", {})
-        user_id = cb.get("user", {}).get("user_id")
+        msg = update.get("message", {})
+        user_id = cb.get("user", {}).get("user_id") or msg.get("sender", {}).get("user_id")
         data = cb.get("payload")
         callback_id = cb.get("callback_id")
+        mid = msg.get("body", {}).get("mid")
+        
+        logger.info(f"MAX Callback: user={user_id}, mid={mid}, data={data}")
+        if not mid:
+            # Fallback for debugging if sibling structure is still not right
+            mid = cb.get("message", {}).get("mid")
+            if mid: logger.info(f"Found mid in callback.message: {mid}")
+            
         user_state = await state_manager.get_state(str(user_id))
 
         if data.startswith("week:"):
             offset = int(data.split(":")[1])
-            mid = cb.get("message", {}).get("body", {}).get("mid")
+            mid = cb.get("message", {}).get("mid")
             await max_client.edit_message(mid, "Выберите дату:", build_max_date_keyboard(offset))
             await max_client.answer_callback(callback_id, "Пагинация")
         
         elif data.startswith("date:"):
             date_str = data.split(":")[1]
             date_human = get_date_human(date_str)
-            mid = cb.get("message", {}).get("body", {}).get("mid")
+            mid = cb.get("message", {}).get("mid")
             
             # Show "loading" by editing the message
             await max_client.edit_message(mid, f"⏳ Загружаю данные на {date_human}...")
@@ -269,7 +278,7 @@ async def max_webhook(request: Request, x_max_bot_api_secret: str = Header(None)
 
         elif data.startswith("toggle:"):
             pair_id = data.split(":")[1]
-            mid = cb.get("message", {}).get("body", {}).get("mid")
+            mid = cb.get("message", {}).get("mid")
             selections = user_state.get("selections", {})
             selections[pair_id] = not selections.get(pair_id, True)
             user_state["selections"] = selections
@@ -279,7 +288,7 @@ async def max_webhook(request: Request, x_max_bot_api_secret: str = Header(None)
 
         elif data == "toggle_all":
             pairs = user_state.get("pairs", [])
-            mid = cb.get("message", {}).get("body", {}).get("mid")
+            mid = cb.get("message", {}).get("mid")
             selections = user_state.get("selections", {})
             all_selected = all(selections.get(f"pair_{i}", True) for i in range(len(pairs)))
             for i in range(len(pairs)): selections[f"pair_{i}"] = not all_selected
@@ -289,12 +298,21 @@ async def max_webhook(request: Request, x_max_bot_api_secret: str = Header(None)
             await max_client.answer_callback(callback_id, "Все переключено")
 
         elif data == "generate_pdf":
-            mid = cb.get("message", {}).get("body", {}).get("mid")
+            mid = cb.get("message", {}).get("mid")
             date_str = user_state.get("selected_date")
-            selected_pairs = [user_state["pairs"][i] for i in range(len(user_state["pairs"])) if user_state["selections"].get(f"pair_{i}", True)]
+            pairs = user_state.get("pairs")
+            selections = user_state.get("selections")
+            
+            if not date_str or not pairs or not selections:
+                logger.warning(f"MAX generate_pdf state missing: {user_state}")
+                await max_client.edit_message(mid, "⚠️ Сессия истекла или данные не выбраны. Начните сначала:", build_max_date_keyboard(0))
+                await max_client.answer_callback(callback_id, "Ошибка сессии")
+                return
+
+            selected_pairs = [pairs[i] for i in range(len(pairs)) if selections.get(f"pair_{i}", True)]
             
             if not selected_pairs:
-                await max_client.edit_message(mid, "❌ Выберите хотя бы одну пару!", build_max_selection_keyboard(user_state["pairs"], user_state["selections"]))
+                await max_client.edit_message(mid, "❌ Выберите хотя бы одну пару!", build_max_selection_keyboard(pairs, selections))
                 return
             
             # Show "generating"
@@ -309,11 +327,11 @@ async def max_webhook(request: Request, x_max_bot_api_secret: str = Header(None)
                 await max_client.edit_message(mid, "✅ PDF отправлен! Выберите следующую дату:", build_max_date_keyboard(0))
             except Exception as e:
                 logger.exception("MAX PDF error")
-                await max_client.edit_message(mid, f"❌ Ошибка генерации: {e}", build_max_selection_keyboard(selected_pairs, user_state["selections"]))
+                await max_client.edit_message(mid, f"❌ Ошибка генерации: {e}", build_max_selection_keyboard(pairs, selections))
             await max_client.answer_callback(callback_id, "PDF сгенерирован")
 
         elif data == "back_to_calendar":
-            mid = cb.get("message", {}).get("body", {}).get("mid")
+            mid = cb.get("message", {}).get("mid")
             await state_manager.clear_state(str(user_id))
             await max_client.edit_message(mid, "📅 Выберите дату:", build_max_date_keyboard(0))
             await max_client.answer_callback(callback_id, "Назад")
