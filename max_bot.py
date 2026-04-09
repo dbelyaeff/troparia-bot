@@ -60,16 +60,34 @@ class MAXClient:
             return resp.json()
 
     async def answer_callback(self, callback_id: str, text: str):
-        body = {"callback_id": callback_id, "message": {"text": text}}
+        # Use notification for toast message, message for editing/replying
+        body = {
+            "callback_id": callback_id, 
+            "notification": text
+        }
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{BASE_URL}/answers", json=body, headers=self.headers)
-            resp.raise_for_status()
+            # Don't raise for status if it's 400 (likely expired)
+            if resp.status_code != 400:
+                resp.raise_for_status()
 
     async def upload_file(self, file_bytes: bytes, filename: str) -> str:
         async with httpx.AsyncClient() as client:
-            files = {"file": (filename, file_bytes, "application/pdf")}
-            resp = await client.post(f"{BASE_URL}/uploads?type=file", files=files, headers={"Authorization": MAX_TOKEN})
+            # Step 1: Get upload URL
+            # Note: headers include Content-Type: application/json from __init__, 
+            # but for an empty body POST it should be fine.
+            resp = await client.post(f"{BASE_URL}/uploads?type=file", headers=self.headers)
             resp.raise_for_status()
+            upload_url = resp.json()["url"]
+            
+            # Step 2: Upload actual data
+            # Use 'data' field as specified in research for some MAX API versions, 
+            # or 'file'. My curl test used 'file' and worked to get the URL, 
+            # but the 2nd step usually expects 'data' or 'file'.
+            files = {"file": (filename, file_bytes, "application/pdf")}
+            resp = await client.post(upload_url, files=files)
+            resp.raise_for_status()
+            # This step finally returns the token
             return resp.json()["token"]
 
     async def send_file(self, user_id: int, token: str, text: str):
