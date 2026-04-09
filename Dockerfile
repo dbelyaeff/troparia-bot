@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Приложение
 COPY *.py ./
+RUN mkdir -p /app/logs
 COPY fonts/ ./fonts/
 
 CMD ["python", "bot.py"]

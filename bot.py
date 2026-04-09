@@ -21,11 +21,27 @@ from shared_logic import (
 )
 from state import state_manager
 
-logging.basicConfig(
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    level=logging.INFO,
+import logging.handlers
+
+LOG_DIR = os.environ.get("LOG_DIR", "logs")
+if not os.path.isabs(LOG_DIR):
+    LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), LOG_DIR)
+os.makedirs(LOG_DIR, exist_ok=True)
+
+logger = logging.getLogger("telegram_bot")
+logger.setLevel(logging.INFO)
+
+# File handler with rotation
+file_handler = logging.handlers.TimedRotatingFileHandler(
+    os.path.join(LOG_DIR, "telegram.log"), when="D", interval=1, backupCount=7
 )
-logger = logging.getLogger(__name__)
+file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+logger.addHandler(console_handler)
 
 FONT_PATH = os.environ.get("FONT_PATH", "/app/fonts/PonomarUnicode.otf")
 

@@ -13,6 +13,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
     networks:
       - caddy
+    volumes:
+      - ./logs:/app/logs
 
   max-bot:
     build: .
@@ -28,6 +30,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
     networks:
       - caddy
+    volumes:
+      - ./logs:/app/logs
 
   redis:
     image: redis:7-alpine
