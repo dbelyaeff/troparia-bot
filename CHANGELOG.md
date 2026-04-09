@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Port `8080` exposed for internal communication.
 - Deployment automation via `Makefile`.
 - Project documentation: `CHANGELOG.md` and `AGENTS.md`.
+- Verified Git-based deployment workflow.
 
 ### Changed
 - Switched from Long Polling to Webhooks for production deployment.
