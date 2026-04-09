@@ -1,8 +1,17 @@
 services:
   bot:
     build: .
+    container_name: troparia-bot
     restart: unless-stopped
     env_file:
       - .env
     environment:
       - FONT_PATH=/app/fonts/PonomarUnicode.otf
+      - PORT=8080
+    networks:
+      - caddy
+
+networks:
+  caddy:
+    external: true
+    name: caddy-network

@@ -11,6 +11,7 @@ import logging
 import os
 import re
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
@@ -753,8 +754,21 @@ def main():
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_handler))
 
-    logger.info("🤖 Бот запущен (Long Polling)")
-    app.run_polling(drop_pending_updates=True)
+    webhook_url = os.environ.get("WEBHOOK_URL")
+    if webhook_url:
+        webhook_path = urlparse(webhook_url).path.lstrip('/')
+        port = int(os.environ.get("PORT", 8080))
+        logger.info(f"🤖 Бот запущен (Webhooks: {webhook_url}, port: {port})")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=webhook_path,
+            webhook_url=webhook_url,
+            drop_pending_updates=True
+        )
+    else:
+        logger.info("🤖 Бот запущен (Long Polling)")
+        app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
