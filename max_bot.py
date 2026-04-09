@@ -21,7 +21,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: register webhook
+    webhook_url = os.environ.get("MAX_WEBHOOK_URL")
+    webhook_secret = os.environ.get("MAX_WEBHOOK_SECRET")
+    if webhook_url and MAX_TOKEN:
+        try:
+            logger.info(f"Registering MAX webhook: {webhook_url}")
+            await max_client.register_webhook(webhook_url, webhook_secret)
+            logger.info("MAX webhook registered successfully")
+        except Exception as e:
+            logger.error(f"Failed to register MAX webhook: {e}")
+    yield
+    # Shutdown: cleanup if needed
+
+app = FastAPI(lifespan=lifespan)
 
 MAX_TOKEN = os.environ.get("MAX_BOT_TOKEN")
 MAX_SECRET = os.environ.get("MAX_WEBHOOK_SECRET")
@@ -63,6 +80,15 @@ class MAXClient:
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{BASE_URL}/messages?user_id={user_id}", json=body, headers=self.headers)
             resp.raise_for_status()
+
+    async def register_webhook(self, url: str, secret: Optional[str] = None):
+        body = {"url": url}
+        if secret:
+            body["secret"] = secret
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(f"{BASE_URL}/webhooks", json=body, headers=self.headers)
+            resp.raise_for_status()
+            return resp.json()
 
 max_client = MAXClient(MAX_TOKEN)
 

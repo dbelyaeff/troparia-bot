@@ -22,3 +22,7 @@ Welcome to the Troparia Bot project! To maintain consistency and reliable deploy
 ## 4. Safety
 - Do not run `docker compose` locally while production is active if it shares resources or state (though currently stateless).
 - Always check remote logs with `make logs` after deployment.
+
+## 5. Webhook Security
+- **Secret Validation**: All webhooks (Telegram and MAX) MUST validate a secret token provided in headers (`X-Telegram-Bot-Api-Secret-Token` for Telegram, `X-Max-Bot-Api-Secret` for MAX).
+- **Auto-Setup**: Bots MUST automatically register/update their webhooks with the correct URL and secret upon startup.

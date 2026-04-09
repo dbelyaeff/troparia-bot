@@ -231,12 +231,24 @@ def main():
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_handler))
 
-    webhook_url = os.environ.get("WEBHOOK_URL")
+    webhook_url = os.environ.get("TELEGRAM_WEBHOOK_URL") or os.environ.get("WEBHOOK_URL")
+    webhook_secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET")
+    
     if webhook_url:
         webhook_path = urlparse(webhook_url).path.lstrip('/')
         port = int(os.environ.get("PORT", 8080))
-        app.run_webhook(listen="0.0.0.0", port=port, url_path=webhook_path, webhook_url=webhook_url, drop_pending_updates=True)
+        
+        logger.info(f"Starting in WEBHOOK mode. URL: {webhook_url}")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=webhook_path,
+            webhook_url=webhook_url,
+            secret_token=webhook_secret,
+            drop_pending_updates=True
+        )
     else:
+        logger.info("Starting in POLLING mode")
         app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
