@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Приложение
-COPY bot.py generator.py ./
+COPY *.py ./
 COPY fonts/ ./fonts/
 
 CMD ["python", "bot.py"]
