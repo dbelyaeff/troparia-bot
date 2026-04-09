@@ -8,19 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - 2026-04-09
 
 ### Added
-- Webhook support in `bot.py` via `python-telegram-bot[webhooks]`.
-- Docker network configuration for integration with Caddy proxy.
-- Port `8080` exposed for internal communication.
-- Deployment automation via `Makefile`.
-- Project documentation: `CHANGELOG.md` and `AGENTS.md`.
-- Verified Git-based deployment workflow.
+- **MAX Messenger Support**: New bot service for MAX messenger platform.
+- **Redis State Management**: Persistent user state using Redis storage.
+- **Automated Testing Suite**: Full suite of unit and integration tests with ~85% coverage.
+- **Multi-platform shared logic**: Extracted business logic to `shared_logic.py`.
+- **MAX Bot API Client**: Custom client for MAX platform.
 
 ### Changed
-- Switched from Long Polling to Webhooks for production deployment.
-- Production environment now runs on `tgmx` server.
-- Reverse proxy configured via Caddy.
+- **Telegram Bot Refactoring**: Migrated `bot.py` to use `shared_logic` and Redis state.
+- **Infrastructure**: Updated `docker-compose.yml` with `redis` and `max-bot` services.
+- **Deployment**: Updated `Makefile` with testing and multi-service deployment support.
 
-## [1.0.0] - 2026-04-09
-- Initial release of the Troparia Bot.
-- Support for generating PDF with Troparia and Kontakia.
-- Integration with azbyka.ru.
+### Fixed
+- User state persistence across container restarts.
+- Consistent liturgical date calculation across platforms.

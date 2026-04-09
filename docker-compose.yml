@@ -3,13 +3,43 @@ services:
     build: .
     container_name: troparia-bot
     restart: unless-stopped
+    depends_on:
+      - redis
     env_file:
       - .env
     environment:
       - FONT_PATH=/app/fonts/PonomarUnicode.otf
       - PORT=8080
+      - REDIS_URL=redis://redis:6379/0
     networks:
       - caddy
+
+  max-bot:
+    build: .
+    container_name: troparia-max-bot
+    restart: unless-stopped
+    command: uvicorn max_bot:app --host 0.0.0.0 --port 8000
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    environment:
+      - FONT_PATH=/app/fonts/PonomarUnicode.otf
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - caddy
+
+  redis:
+    image: redis:7-alpine
+    container_name: troparia-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - caddy
+
+volumes:
+  redis_data:
 
 networks:
   caddy:
