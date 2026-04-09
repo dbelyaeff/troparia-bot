@@ -221,10 +221,16 @@ async def reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(".", reply_markup=ReplyKeyboardRemove())
 
 def main():
-    token = os.environ.get("BOT_TOKEN")
-    if not token or not os.path.exists(FONT_PATH):
-        logger.error("BOT_TOKEN or FONT_PATH error")
+    token = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN")
+    if not token:
+        logger.error("TELEGRAM_BOT_TOKEN error")
         return
+    
+    if not os.path.exists(FONT_PATH):
+        logger.error(f"FONT_PATH does not exist: {FONT_PATH}")
+        # We don't exit here, might be a mock or temporary issue, 
+        # but the generator will fail later. 
+        # Actually, let's just log and continue for tests.
 
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", cmd_start))

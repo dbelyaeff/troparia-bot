@@ -82,11 +82,14 @@ class MAXClient:
             resp.raise_for_status()
 
     async def register_webhook(self, url: str, secret: Optional[str] = None):
-        body = {"url": url}
+        body = {
+            "url": url,
+            "update_types": ["message_created", "bot_started", "message_callback"]
+        }
         if secret:
             body["secret"] = secret
         async with httpx.AsyncClient() as client:
-            resp = await client.post(f"{BASE_URL}/webhooks", json=body, headers=self.headers)
+            resp = await client.post(f"{BASE_URL}/subscriptions", json=body, headers=self.headers)
             resp.raise_for_status()
             return resp.json()
 
