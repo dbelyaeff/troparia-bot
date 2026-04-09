@@ -72,6 +72,8 @@ class MAXClient:
         
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{BASE_URL}/messages?user_id={user_id}", json=body, headers=self.headers)
+            if resp.status_code >= 400:
+                logger.error(f"MAX send_message error {resp.status_code}: {resp.text}")
             resp.raise_for_status()
             data = resp.json()
             logger.info(f"Sent message to {user_id}: {data.get('body', {}).get('mid')}")
@@ -84,6 +86,8 @@ class MAXClient:
         
         async with httpx.AsyncClient() as client:
             resp = await client.put(f"{BASE_URL}/messages?message_id={mid}", json=body, headers=self.headers)
+            if resp.status_code >= 400:
+                logger.error(f"MAX edit_message error {resp.status_code}: {resp.text}")
             resp.raise_for_status()
             logger.info(f"Edited message {mid}")
             return resp.json()
@@ -97,24 +101,26 @@ class MAXClient:
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{BASE_URL}/answers", json=body, headers=self.headers)
             # Don't raise for status if it's 400 (likely expired)
-            if resp.status_code != 400:
+            if resp.status_code >= 400 and resp.status_code != 400:
+                logger.error(f"MAX answer_callback error {resp.status_code}: {resp.text}")
                 resp.raise_for_status()
+            elif resp.status_code == 400:
+                logger.warning(f"MAX answer_callback expired (400): {resp.text}")
 
     async def upload_file(self, file_bytes: bytes, filename: str) -> str:
         async with httpx.AsyncClient() as client:
             # Step 1: Get upload URL
-            # Note: headers include Content-Type: application/json from __init__, 
-            # but for an empty body POST it should be fine.
             resp = await client.post(f"{BASE_URL}/uploads?type=file", headers=self.headers)
+            if resp.status_code >= 400:
+                logger.error(f"MAX upload_file step 1 error {resp.status_code}: {resp.text}")
             resp.raise_for_status()
             upload_url = resp.json()["url"]
             
             # Step 2: Upload actual data
-            # Use 'data' field as specified in research for some MAX API versions, 
-            # or 'file'. My curl test used 'file' and worked to get the URL, 
-            # but the 2nd step usually expects 'data' or 'file'.
             files = {"file": (filename, file_bytes, "application/pdf")}
             resp = await client.post(upload_url, files=files)
+            if resp.status_code >= 400:
+                logger.error(f"MAX upload_file step 2 error {resp.status_code}: {resp.text}")
             resp.raise_for_status()
             # This step finally returns the token
             return resp.json()["token"]
@@ -122,10 +128,13 @@ class MAXClient:
     async def send_file(self, user_id: int, token: str, text: str):
         body = {
             "text": text,
+            "format": "html",
             "attachments": [{"type": "file", "payload": {"token": token}}]
         }
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{BASE_URL}/messages?user_id={user_id}", json=body, headers=self.headers)
+            if resp.status_code >= 400:
+                logger.error(f"MAX send_file error {resp.status_code}: {resp.text}")
             resp.raise_for_status()
 
     async def register_webhook(self, url: str, secret: Optional[str] = None):
