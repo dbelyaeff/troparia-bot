@@ -54,7 +54,8 @@ async def lifespan(app: FastAPI):
     webhook_url = os.environ.get("MAX_WEBHOOK_URL")
     if webhook_url:
         try:
-            logger.info(f"Registering MAX webhook: {webhook_url}")
+            logger.info(f"Starting bot and registering MAX webhook: {webhook_url}")
+            await bot.start()
             await bot.subscribe(url=webhook_url, secret=MAX_SECRET)
             logger.info("MAX webhook registered successfully")
         except Exception as e:
