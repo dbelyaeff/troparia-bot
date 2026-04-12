@@ -3,9 +3,10 @@ import logging
 import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
+from contextlib import asynccontextmanager
 
-import maxo
-from maxo.models import InlineKeyboard, InlineButton, File
+from maxo.bot import Bot
+from maxo.types import Keyboard, CallbackButton, LinkButton, FileAttachment as File, Message, Callback
 from fastapi import FastAPI, Request, Header, HTTPException
 from generator import generate_pdf_bytes
 from shared_logic import (
@@ -81,45 +82,38 @@ def build_max_date_keyboard(week_offset: int = 0) -> InlineKeyboard:
                 buttons.append(row); row = []
         if row: buttons.append(row)
     else:
-        row = []
-        for i in range(7):
-            d = start + timedelta(days=i)
-            row.append(InlineButton(text=f"{d.day} {MONTHS_RU[d.month]} ({DAYS_RU[d.weekday()]})", payload=f"date:{d.isoformat()}"))
-            if len(row) == 2:
-                buttons.append(row); row = []
-        if row: buttons.append(row)
+    start_of_week = liturgical_today + timedelta(weeks=week_offset)
+    rows: List[List[CallbackButton]] = []
+    
+    # Navigation row
+    nav_row = [
+        CallbackButton(text="◀️", payload=f"date_week_{week_offset - 1}"),
+        CallbackButton(text="▶️", payload=f"date_week_{week_offset + 1}")
+    ]
+    rows.append(nav_row)
+    
+    # Date buttons
+    for i in range(7):
+        date = start_of_week + timedelta(days=i)
+        date_str = date.strftime("%Y-%m-%d")
+        button_text = f"{date.day} {MONTHS_RU[date.month]} ({DAYS_RU[date.weekday()]})"
+        rows.append([CallbackButton(text=button_text, payload=f"date_select_{date_str}")])
+        
+    return Keyboard(buttons=rows)
 
-    nav = []
-    if week_offset > 0:
-        nav.append(InlineButton(text="⬅️ Назад", payload=f"week:{week_offset - 1}"))
-    nav.append(InlineButton(text="Вперёд ▶️", payload=f"week:{week_offset + 1}"))
-    buttons.append(nav)
-    return InlineKeyboard(buttons=buttons)
-
-def build_max_selection_keyboard(pairs: list, selections: dict) -> InlineKeyboard:
-    buttons = []
-    for pair_idx, pair in enumerate(pairs):
-        pair_id = f"pair_{pair_idx}"
-        is_selected = selections.get(pair_id, True)
-        check = "✅" if is_selected else "❌"
-        label = f"{check} {pair.get('section', '')}"
-        buttons.append([InlineButton(text=label, payload=f"toggle:{pair_id}")])
-    
-    if pairs:
-        all_selected = all(selections.get(f"pair_{i}", True) for i in range(len(pairs)))
-        toggle_all_text = "❌ Снять все" if all_selected else "✅ Выбрать все"
-        buttons.append([InlineButton(text=toggle_all_text, payload="toggle_all")])
-    
-    # Кнопки действия
-    buttons.append([InlineButton(text="📄 Сгенерировать PDF", payload="generate_pdf")])
-    buttons.append([InlineButton(text="⬅️ К календарю", payload="back_to_calendar")])
-    
-    return InlineKeyboard(buttons=buttons)
+def build_max_selection_keyboard(pairs: list, selections: dict, lang: str = "ru", date_str: str = "") -> Keyboard:
+    rows = [
+        [CallbackButton(text="📜 Текст", payload=f"toggle:text:{lang}:{date_str}"),
+         CallbackButton(text="🎵 Аудио", payload=f"toggle:audio:{lang}:{date_str}")],
+        [CallbackButton(text="📅 Дата", payload="select_date"),
+         CallbackButton(text="🌐 RU/EN", payload=f"toggle:lang:{lang}:{date_str}")]
+    ]
+    return Keyboard(buttons=rows)
 
 # ─── Обработчики ───
 
-@dp.message(F.text == "/start")
-async def handle_start(message: maxo.types.Message):
+@dp.message(lambda m: m.text == "/start")
+async def handle_start(message: Message):
     user_id = message.sender.user_id
     await state_manager.clear_state(str(user_id))
     await bot.send_message(
@@ -128,26 +122,29 @@ async def handle_start(message: maxo.types.Message):
          keyboard=build_max_date_keyboard(0)
     )
 
-@dp.callback(F.payload.startswith("week:"))
-async def handle_pagination(callback: maxo.types.Callback):
-    offset = int(callback.payload.split(":")[1])
-    mid = callback.message.mid if callback.message else None
-    if mid:
-        await bot.edit_message(
-            message_id=mid,
-            text="Выберите дату:",
-            keyboard=build_max_date_keyboard(offset)
-        )
-    await bot.answer_callback(callback.callback_id, "Пагинация")
-        
-@dp.callback(F.payload.startswith("date:"))
-async def handle_date_selection(callback: maxo.types.Callback):
-    user_id = callback.user.user_id
-    date_str = callback.payload.split(":")[1]
+@dp.callback(lambda c: c.payload.startswith("date_week_"))
+async def handle_date_nav(c: Callback):
+    week_offset = int(c.payload.split("_")[2])
+    kb = build_max_date_keyboard(week_offset)
+    await bot.edit_message(message_id=c.message.mid, text="Выберите дату:", keyboard=kb)
+
+@dp.callback(lambda c: c.payload.startswith("date_select_"))
+async def handle_date_select(c: Callback):
+    date_str = c.payload.split("_")[2]
+    kb = build_max_selection_keyboard([], {}, "ru", date_str)
+    await bot.edit_message(message_id=c.message.mid, text=f"Настройки для {date_str}:", keyboard=kb)
+
+@dp.callback(lambda c: c.payload == "select_date")
+async def handle_select_date_btn(c: Callback):
+    kb = build_max_date_keyboard(0)
+    await bot.edit_message(message_id=c.message.mid, text="Выберите дату:", keyboard=kb)
+
+@dp.callback(lambda c: c.payload.startswith("toggle:"))
+async def handle_toggle(c: Callback):
+    parts = c.payload.split(":")
+    user_id = c.user.user_id
+    date_str = parts[3]
     date_human = get_date_human(date_str)
-    mid = callback.message.mid if callback.message else None
-    
-    if mid:
         await bot.edit_message(message_id=mid, text=f"⏳ Загружаю данные на {date_human}...")
     
     user_state = await state_manager.get_state(str(user_id))
