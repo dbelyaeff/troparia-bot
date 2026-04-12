@@ -6,6 +6,7 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libfreetype6-dev \
+        git \
     && rm -rf /var/lib/apt/lists/*
 
 # Python-зависимости

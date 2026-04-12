@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **maxo library integration**: Migrated `max_bot.py` from manual `httpx` logic to `maxo` library for a more robust, event-driven architecture.
+- **Improved InlineKeyboard logic**: Resolved persistent `mid=None` issues by using `maxo`'s built-in update parsing and `F` filters.
+- **Automated file handling**: Integrated `maxo.Bot.upload_media` for reliable PDF delivery.
+
 ## [1.1.0] - 2026-04-09
 
 ### Added
