@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 
+import maxo
 from maxo.bot import Bot
 from maxo.types import Keyboard, CallbackButton, LinkButton, FileAttachment as File, Message, Callback
 from fastapi import FastAPI, Request, Header, HTTPException
@@ -41,7 +42,7 @@ MAX_TOKEN = os.environ.get("MAX_BOT_TOKEN")
 MAX_SECRET = os.environ.get("MAX_WEBHOOK_SECRET")
 FONT_PATH = os.environ.get("FONT_PATH", "/app/fonts/PonomarUnicode.otf")
 
-bot = maxo.Bot(token=MAX_TOKEN)
+bot = Bot(token=MAX_TOKEN)
 dp = maxo.Dispatcher(bot)
 
 @asynccontextmanager
@@ -59,29 +60,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# Manual client removed in favor of maxo.Bot
-
 # ─── Клавиатуры ───
 
-def build_max_date_keyboard(week_offset: int = 0) -> InlineKeyboard:
+def build_max_date_keyboard(week_offset: int = 0) -> Keyboard:
     liturgical_today = get_liturgical_date().date()
-    start = liturgical_today + timedelta(weeks=week_offset)
-    buttons = []
-    
-    # Сегодня
-    if week_offset == 0:
-        d = start
-        weekday = DAYS_RU[d.weekday()]
-        buttons.append([InlineButton(text=f"📅 Сегодня {d.day} {MONTHS_RU[d.month]} ({weekday})", payload=f"date:{d.isoformat()}")])
-        # Остальные дни
-        row = []
-        for i in range(1, 7):
-            d = start + timedelta(days=i)
-            row.append(InlineButton(text=f"{d.day} {MONTHS_RU[d.month]} ({DAYS_RU[d.weekday()]})", payload=f"date:{d.isoformat()}"))
-            if len(row) == 2:
-                buttons.append(row); row = []
-        if row: buttons.append(row)
-    else:
     start_of_week = liturgical_today + timedelta(weeks=week_offset)
     rows: List[List[CallbackButton]] = []
     
@@ -96,18 +78,34 @@ def build_max_date_keyboard(week_offset: int = 0) -> InlineKeyboard:
     for i in range(7):
         date = start_of_week + timedelta(days=i)
         date_str = date.strftime("%Y-%m-%d")
-        button_text = f"{date.day} {MONTHS_RU[date.month]} ({DAYS_RU[date.weekday()]})"
-        rows.append([CallbackButton(text=button_text, payload=f"date_select_{date_str}")])
+        weekday = DAYS_RU[date.weekday()]
+        label = f"{date.day} {MONTHS_RU[date.month]} ({weekday})"
+        if date == liturgical_today:
+            label = f"📅 {label}"
+        rows.append([CallbackButton(text=label, payload=f"date_select_{date_str}")])
         
     return Keyboard(buttons=rows)
 
 def build_max_selection_keyboard(pairs: list, selections: dict, lang: str = "ru", date_str: str = "") -> Keyboard:
-    rows = [
-        [CallbackButton(text="📜 Текст", payload=f"toggle:text:{lang}:{date_str}"),
-         CallbackButton(text="🎵 Аудио", payload=f"toggle:audio:{lang}:{date_str}")],
-        [CallbackButton(text="📅 Дата", payload="select_date"),
-         CallbackButton(text="🌐 RU/EN", payload=f"toggle:lang:{lang}:{date_str}")]
+    rows = []
+    
+    # Display toggle for each pair
+    for i, pair in enumerate(pairs):
+        pair_id = f"pair_{i}"
+        is_selected = selections.get(pair_id, True)
+        icon = "✅" if is_selected else "⬜"
+        rows.append([CallbackButton(
+            text=f"{icon} {pair.get('section', '')}", 
+            payload=f"toggle:{pair_id}:{lang}:{date_str}"
+        )])
+
+    # Language and Actions row
+    action_rows = [
+        [CallbackButton(text=f"🌐 Язык: {lang.upper()}", payload=f"toggle:lang:{lang}:{date_str}")],
+        [CallbackButton(text="📄 Сгенерировать PDF", payload=f"generate:{lang}:{date_str}")],
+        [CallbackButton(text="⬅️ К календарю", payload="select_date")]
     ]
+    rows.extend(action_rows)
     return Keyboard(buttons=rows)
 
 # ─── Обработчики ───
@@ -127,127 +125,97 @@ async def handle_date_nav(c: Callback):
     week_offset = int(c.payload.split("_")[2])
     kb = build_max_date_keyboard(week_offset)
     await bot.edit_message(message_id=c.message.mid, text="Выберите дату:", keyboard=kb)
+    await bot.answer_callback(callback_id=c.callback_id)
 
 @dp.callback(lambda c: c.payload.startswith("date_select_"))
 async def handle_date_select(c: Callback):
     date_str = c.payload.split("_")[2]
-    kb = build_max_selection_keyboard([], {}, "ru", date_str)
-    await bot.edit_message(message_id=c.message.mid, text=f"Настройки для {date_str}:", keyboard=kb)
+    user_id = c.user.user_id
+    mid = c.message.mid
+    
+    await bot.edit_message(message_id=mid, text="⏳ Загружаю данные...")
+    
+    try:
+        ukazaniya_text, pairs = await fetch_data_for_date(date_str)
+        user_state = {
+            "selected_date": date_str,
+            "pairs": pairs,
+            "selections": {f"pair_{i}": True for i in range(len(pairs))},
+            "lang": "ru"
+        }
+        await state_manager.set_state(str(user_id), user_state)
+        
+        text = f"📖 <b>Указания</b>: {ukazaniya_text}\n\n🔹 <b>Настройте PDF:</b>"
+        await bot.edit_message(
+            message_id=mid,
+            text=text,
+            keyboard=build_max_selection_keyboard(pairs, user_state["selections"], "ru", date_str)
+        )
+    except Exception as e:
+        logger.exception("MAX data fetch error")
+        await bot.edit_message(message_id=mid, text=f"❌ Ошибка: {e}")
+    
+    await bot.answer_callback(callback_id=c.callback_id)
 
 @dp.callback(lambda c: c.payload == "select_date")
 async def handle_select_date_btn(c: Callback):
     kb = build_max_date_keyboard(0)
     await bot.edit_message(message_id=c.message.mid, text="Выберите дату:", keyboard=kb)
+    await bot.answer_callback(callback_id=c.callback_id)
 
 @dp.callback(lambda c: c.payload.startswith("toggle:"))
 async def handle_toggle(c: Callback):
     parts = c.payload.split(":")
-    user_id = c.user.user_id
+    mode = parts[1] # 'pair_N' or 'lang'
+    lang = parts[2]
     date_str = parts[3]
-    date_human = get_date_human(date_str)
-        await bot.edit_message(message_id=mid, text=f"⏳ Загружаю данные на {date_human}...")
+    user_id = c.user.user_id
+    mid = c.message.mid
     
     user_state = await state_manager.get_state(str(user_id))
-    try:
-        ukazaniya_text, pairs = await fetch_data_for_date(date_str)
-        user_state.update({
-            "selected_date": date_str,
-            "pairs": pairs,
-            "selections": {f"pair_{i}": True for i in range(len(pairs))}
-        })
-        await state_manager.set_state(str(user_id), user_state)
-        
-        text = f"📖 <b>Указания</b>: {ukazaniya_text}\n\n🔹 <b>Выберите тропари:</b>"
-        if mid:
-            await bot.edit_message(
-                message_id=mid, 
-                text=text, 
-                keyboard=build_max_selection_keyboard(pairs, user_state["selections"])
-            )
-    except Exception as e:
-        logger.exception("MAX data fetch error")
-        if mid:
-            await bot.edit_message(message_id=mid, text=f"❌ Ошибка: {e}")
-            
-    await bot.answer_callback(callback_id=callback.callback_id, notification="Дата выбрана")
-
-@dp.callback(F.payload.startswith("toggle:"))
-async def handle_toggle(callback: maxo.types.Callback):
-    user_id = callback.user.user_id
-    pair_id = callback.payload.split(":")[1]
-    mid = callback.message.mid if callback.message else None
-    
-    user_state = await state_manager.get_state(str(user_id))
-    selections = user_state.get("selections", {})
-    selections[pair_id] = not selections.get(pair_id, True)
-    user_state["selections"] = selections
-    await state_manager.set_state(str(user_id), user_state)
-    
-    if mid:
-        await bot.edit_message(
-            message_id=mid,
-            text="Обновлено (выбор тропарей):",
-            keyboard=build_max_selection_keyboard(user_state["pairs"], selections)
-        )
-    await bot.answer_callback(callback_id=callback.callback_id, notification="Переключено")
-
-@dp.callback(F.payload == "toggle_all")
-async def handle_toggle_all(callback: maxo.types.Callback):
-    user_id = callback.user.user_id
-    mid = callback.message.mid if callback.message else None
-    
-    user_state = await state_manager.get_state(str(user_id))
-    pairs = user_state.get("pairs", [])
-    selections = user_state.get("selections", {})
-    all_selected = all(selections.get(f"pair_{i}", True) for i in range(len(pairs)))
-    
-    for i in range(len(pairs)):
-        selections[f"pair_{i}"] = not all_selected
-    
-    user_state["selections"] = selections
-    await state_manager.set_state(str(user_id), user_state)
-    
-    if mid:
-        await bot.edit_message(
-            message_id=mid,
-            text="Обновлено (все):",
-            keyboard=build_max_selection_keyboard(pairs, selections)
-        )
-    await bot.answer_callback(callback_id=callback.callback_id, notification="Все переключено")
-
-@dp.callback(F.payload == "generate_pdf")
-async def handle_generate_pdf(callback: maxo.types.Callback):
-    user_id = callback.user.user_id
-    mid = callback.message.mid if callback.message else None
-    user_state = await state_manager.get_state(str(user_id))
-    
-    date_str = user_state.get("selected_date")
-    pairs = user_state.get("pairs")
-    selections = user_state.get("selections")
-    
-    if not date_str or not pairs or not selections:
-        if mid:
-            await bot.edit_message(
-                message_id=mid,
-                text="⚠️ Сессия истекла или данные не выбраны. Начните сначала:",
-                keyboard=build_max_date_keyboard(0)
-            )
-        await bot.answer_callback(callback_id=callback.callback_id, notification="Ошибка сессии")
+    if not user_state:
+        await bot.answer_callback(callback_id=c.callback_id, notification="Сессия истекла")
         return
 
+    if mode == "lang":
+        user_state["lang"] = "en" if lang == "ru" else "ru"
+    elif mode.startswith("pair_"):
+        selections = user_state.get("selections", {})
+        selections[mode] = not selections.get(mode, True)
+    
+    await state_manager.set_state(str(user_id), user_state)
+    
+    await bot.edit_message(
+        message_id=mid,
+        text="Настройки обновлены:",
+        keyboard=build_max_selection_keyboard(
+            user_state["pairs"], user_state["selections"], user_state["lang"], date_str
+        )
+    )
+    await bot.answer_callback(callback_id=c.callback_id)
+
+@dp.callback(lambda c: c.payload.startswith("generate:"))
+async def handle_generate(c: Callback):
+    parts = c.payload.split(":")
+    lang = parts[1]
+    date_str = parts[2]
+    user_id = c.user.user_id
+    mid = c.message.mid
+    
+    user_state = await state_manager.get_state(str(user_id))
+    if not user_state:
+        await bot.answer_callback(callback_id=c.callback_id, notification="Ошибка сессии")
+        return
+
+    pairs = user_state.get("pairs", [])
+    selections = user_state.get("selections", {})
     selected_pairs = [pairs[i] for i in range(len(pairs)) if selections.get(f"pair_{i}", True)]
     
     if not selected_pairs:
-        if mid:
-            await bot.edit_message(
-                message_id=mid,
-                text="❌ Выберите хотя бы одну пару!",
-                keyboard=build_max_selection_keyboard(pairs, selections)
-            )
+        await bot.answer_callback(callback_id=c.callback_id, notification="Выберите хоть что-то!")
         return
-    
-    if mid:
-        await bot.edit_message(message_id=mid, text="⏳ Генерирую PDF...")
+
+    await bot.edit_message(message_id=mid, text="⏳ Генерирую и отправляю PDF...")
     
     try:
         from unihttp.http import UploadFile
@@ -259,37 +227,19 @@ async def handle_generate_pdf(callback: maxo.types.Callback):
         )
         await bot.send_message(
             user_id=user_id,
-            text=f"☦️ PDF на {get_date_human(date_str)}",
+            text=f"☦️ PDF на {get_date_human(date_str)} ({lang.upper()})",
             attachments=[File(token=media.token)]
         )
-        if mid:
-            await bot.edit_message(
-                message_id=mid,
-                text="✅ PDF отправлен! Выберите следующую дату:",
-                keyboard=build_max_date_keyboard(0)
-            )
-    except Exception as e:
-        logger.exception("MAX PDF error")
-        if mid:
-            await bot.edit_message(
-                message_id=mid,
-                text=f"❌ Ошибка генерации: {e}",
-                keyboard=build_max_selection_keyboard(pairs, selections)
-            )
-    await bot.answer_callback(callback_id=callback.callback_id, notification="PDF сгенерирован")
-
-@dp.callback(F.payload == "back_to_calendar")
-async def handle_back_to_calendar(callback: maxo.types.Callback):
-    user_id = callback.user.user_id
-    mid = callback.message.mid if callback.message else None
-    await state_manager.clear_state(str(user_id))
-    if mid:
         await bot.edit_message(
-            message_id=mid, 
-            text="📅 Выберите дату:", 
+            message_id=mid,
+            text="✅ Готово! Можете выбрать другую дату:",
             keyboard=build_max_date_keyboard(0)
         )
-    await bot.answer_callback(callback_id=callback.callback_id, notification="Назад")
+    except Exception as e:
+        logger.exception("MAX PDF error")
+        await bot.edit_message(message_id=mid, text=f"❌ Ошибка генерации: {e}")
+        
+    await bot.answer_callback(callback_id=c.callback_id)
 
 @app.post("/webhook/1f7c5225-1f1d-4c0c-b0b8-65a71b304b93")
 async def max_webhook(request: Request, x_max_bot_api_secret: str = Header(None)):
