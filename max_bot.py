@@ -7,9 +7,10 @@ from contextlib import asynccontextmanager
 
 import maxo
 from maxo.bot import Bot
-from maxo.types import Keyboard, CallbackButton, LinkButton, FileAttachment as File, Message, Callback
+from maxo.types import Keyboard, CallbackButton, LinkButton, FileAttachment as File, Message, User
 from maxo.routing.signals.update import MaxoUpdate
 from maxo.routing.updates.updates import Updates
+from maxo.routing.updates.message_callback import CallbackQuery
 from fastapi import FastAPI, Request, Header, HTTPException
 from generator import generate_pdf_bytes
 from shared_logic import (
@@ -122,20 +123,22 @@ async def handle_start(message: Message):
          keyboard=build_max_date_keyboard(0)
     )
 
-@dp.callback(lambda c: c.payload.startswith("date_week_"))
-async def handle_date_nav(c: Callback):
+@dp.callback_query(lambda c: c.payload.startswith("date_week_"))
+async def handle_date_nav(c: CallbackQuery):
     week_offset = int(c.payload.split("_")[2])
     kb = build_max_date_keyboard(week_offset)
-    await bot.edit_message(message_id=c.message.mid, text="Выберите дату:", keyboard=kb)
+    if c.message:
+        await bot.edit_message(message_id=c.message.mid, text="Выберите дату:", keyboard=kb)
     await bot.answer_callback(callback_id=c.callback_id)
 
-@dp.callback(lambda c: c.payload.startswith("date_select_"))
-async def handle_date_select(c: Callback):
+@dp.callback_query(lambda c: c.payload.startswith("date_select_"))
+async def handle_date_select(c: CallbackQuery):
     date_str = c.payload.split("_")[2]
     user_id = c.user.user_id
-    mid = c.message.mid
+    mid = c.message.mid if c.message else None
     
-    await bot.edit_message(message_id=mid, text="⏳ Загружаю данные...")
+    if mid:
+        await bot.edit_message(message_id=mid, text="⏳ Загружаю данные...")
     
     try:
         ukazaniya_text, pairs = await fetch_data_for_date(date_str)
@@ -148,31 +151,34 @@ async def handle_date_select(c: Callback):
         await state_manager.set_state(str(user_id), user_state)
         
         text = f"📖 <b>Указания</b>: {ukazaniya_text}\n\n🔹 <b>Настройте PDF:</b>"
-        await bot.edit_message(
-            message_id=mid,
-            text=text,
-            keyboard=build_max_selection_keyboard(pairs, user_state["selections"], "ru", date_str)
-        )
+        if mid:
+            await bot.edit_message(
+                message_id=mid,
+                text=text,
+                keyboard=build_max_selection_keyboard(pairs, user_state["selections"], "ru", date_str)
+            )
     except Exception as e:
         logger.exception("MAX data fetch error")
-        await bot.edit_message(message_id=mid, text=f"❌ Ошибка: {e}")
+        if mid:
+            await bot.edit_message(message_id=mid, text=f"❌ Ошибка: {e}")
     
     await bot.answer_callback(callback_id=c.callback_id)
 
-@dp.callback(lambda c: c.payload == "select_date")
-async def handle_select_date_btn(c: Callback):
+@dp.callback_query(lambda c: c.payload == "select_date")
+async def handle_select_date_btn(c: CallbackQuery):
     kb = build_max_date_keyboard(0)
-    await bot.edit_message(message_id=c.message.mid, text="Выберите дату:", keyboard=kb)
+    if c.message:
+        await bot.edit_message(message_id=c.message.mid, text="Выберите дату:", keyboard=kb)
     await bot.answer_callback(callback_id=c.callback_id)
 
-@dp.callback(lambda c: c.payload.startswith("toggle:"))
-async def handle_toggle(c: Callback):
+@dp.callback_query(lambda c: c.payload.startswith("toggle:"))
+async def handle_toggle(c: CallbackQuery):
     parts = c.payload.split(":")
     mode = parts[1] # 'pair_N' or 'lang'
     lang = parts[2]
     date_str = parts[3]
     user_id = c.user.user_id
-    mid = c.message.mid
+    mid = c.message.mid if c.message else None
     
     user_state = await state_manager.get_state(str(user_id))
     if not user_state:
@@ -187,22 +193,23 @@ async def handle_toggle(c: Callback):
     
     await state_manager.set_state(str(user_id), user_state)
     
-    await bot.edit_message(
-        message_id=mid,
-        text="Настройки обновлены:",
-        keyboard=build_max_selection_keyboard(
-            user_state["pairs"], user_state["selections"], user_state["lang"], date_str
+    if mid:
+        await bot.edit_message(
+            message_id=mid,
+            text="Настройки обновлены:",
+            keyboard=build_max_selection_keyboard(
+                user_state["pairs"], user_state["selections"], user_state["lang"], date_str
+            )
         )
-    )
     await bot.answer_callback(callback_id=c.callback_id)
 
-@dp.callback(lambda c: c.payload.startswith("generate:"))
-async def handle_generate(c: Callback):
+@dp.callback_query(lambda c: c.payload.startswith("generate:"))
+async def handle_generate(c: CallbackQuery):
     parts = c.payload.split(":")
     lang = parts[1]
     date_str = parts[2]
     user_id = c.user.user_id
-    mid = c.message.mid
+    mid = c.message.mid if c.message else None
     
     user_state = await state_manager.get_state(str(user_id))
     if not user_state:
@@ -217,7 +224,8 @@ async def handle_generate(c: Callback):
         await bot.answer_callback(callback_id=c.callback_id, notification="Выберите хоть что-то!")
         return
 
-    await bot.edit_message(message_id=mid, text="⏳ Генерирую и отправляю PDF...")
+    if mid:
+        await bot.edit_message(message_id=mid, text="⏳ Генерирую и отправляю PDF...")
     
     try:
         from unihttp.http import UploadFile
@@ -232,14 +240,16 @@ async def handle_generate(c: Callback):
             text=f"☦️ PDF на {get_date_human(date_str)} ({lang.upper()})",
             attachments=[File(token=media.token)]
         )
-        await bot.edit_message(
-            message_id=mid,
-            text="✅ Готово! Можете выбрать другую дату:",
-            keyboard=build_max_date_keyboard(0)
-        )
+        if mid:
+            await bot.edit_message(
+                message_id=mid,
+                text="✅ Готово! Можете выбрать другую дату:",
+                keyboard=build_max_date_keyboard(0)
+            )
     except Exception as e:
         logger.exception("MAX PDF error")
-        await bot.edit_message(message_id=mid, text=f"❌ Ошибка генерации: {e}")
+        if mid:
+            await bot.edit_message(message_id=mid, text=f"❌ Ошибка генерации: {e}")
         
     await bot.answer_callback(callback_id=c.callback_id)
 
