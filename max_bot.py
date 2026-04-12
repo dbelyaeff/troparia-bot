@@ -8,6 +8,8 @@ from contextlib import asynccontextmanager
 import maxo
 from maxo.bot import Bot
 from maxo.types import Keyboard, CallbackButton, LinkButton, FileAttachment as File, Message, Callback
+from maxo.routing.signals.update import MaxoUpdate
+from maxo.routing.updates.updates import Updates
 from fastapi import FastAPI, Request, Header, HTTPException
 from generator import generate_pdf_bytes
 from shared_logic import (
@@ -43,7 +45,7 @@ MAX_SECRET = os.environ.get("MAX_WEBHOOK_SECRET")
 FONT_PATH = os.environ.get("FONT_PATH", "/app/fonts/PonomarUnicode.otf")
 
 bot = Bot(token=MAX_TOKEN)
-dp = maxo.Dispatcher(bot)
+dp = maxo.Dispatcher()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -248,5 +250,9 @@ async def max_webhook(request: Request, x_max_bot_api_secret: str = Header(None)
         raise HTTPException(status_code=403, detail="Invalid secret")
     
     update_data = await request.json()
-    await dp.feed_update(update_data)
+    try:
+        update = MaxoUpdate(update=bot.retort.load(update_data, Updates))
+        await dp.feed_max_update(bot=bot, update=update)
+    except Exception as e:
+        logger.error(f"Error feeding update: {e}")
     return {"status": "ok"}
