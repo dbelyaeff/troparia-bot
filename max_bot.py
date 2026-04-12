@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 
 import maxo
-from maxo.filters import F
 from maxo.models import InlineKeyboard, InlineButton, File
 from fastapi import FastAPI, Request, Header, HTTPException
 from generator import generate_pdf_bytes
