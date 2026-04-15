@@ -9,6 +9,7 @@ from maxapi import Bot, Dispatcher
 from maxapi.methods.types.getted_updates import process_update_webhook
 from maxapi.types import MessageCreated, MessageCallback, InputMediaBuffer, CallbackButton
 from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
+from maxapi.enums.parse_mode import ParseMode
 # ─── Monkeypatch maxapi ───
 # The library uses deprecated access_token query param and wrong default URL.
 # We fix it here to avoid maintainance overhead of a local fork.
@@ -73,7 +74,8 @@ MAX_TOKEN = os.environ.get("MAX_BOT_TOKEN")
 MAX_SECRET = os.environ.get("MAX_WEBHOOK_SECRET")
 FONT_PATH = os.environ.get("FONT_PATH", "/app/fonts/PonomarUnicode.otf")
 
-bot = Bot(token=MAX_TOKEN)
+# Use the correct platform-api domain and enable HTML parsing
+bot = Bot(token=MAX_TOKEN, parse_mode=ParseMode.HTML)
 bot.API_URL = 'https://platform-api.max.ru'
 dp = Dispatcher()
 
