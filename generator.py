@@ -453,7 +453,7 @@ def _find_optimal_font(sections, max_pages=MAX_PAGES):
     
     # Начинаем с максимального шрифта и уменьшаем, пока не заполним нужное количество страниц
     fs = FONT_MAX
-    best_fs = FONT_MAX
+    best_fs = 0.0
     
     while fs >= FONT_MIN:
         blocks = _build_blocks(sections, fs)

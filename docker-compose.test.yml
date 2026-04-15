@@ -1,0 +1,27 @@
+services:
+  max-bot-test:
+    build: .
+    container_name: troparia-max-bot-test
+    command: python3 -m pytest --cov=. tests/
+    depends_on:
+      - redis-test
+    env_file:
+      - .env
+    environment:
+      - FONT_PATH=/app/fonts/PonomarUnicode.otf
+      - REDIS_URL=redis://redis-test:6379/0
+      - MAX_BOT_TOKEN=dummy_token
+      - MAX_WEBHOOK_SECRET=dummy_secret
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: troparia-redis-test
+    networks:
+      - default
+
+networks:
+  default:
+    name: troparia-test-network

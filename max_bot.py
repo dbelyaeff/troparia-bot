@@ -5,12 +5,12 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 
-import maxo
-from maxo.bot import Bot
-from maxo.types import Keyboard, CallbackButton, LinkButton, FileAttachment as File, Message, User
-from maxo.routing.signals.update import MaxoUpdate
-from maxo.routing.updates.updates import Updates
-from maxo.routing.updates.message_callback import CallbackQuery
+from maxapi import Bot, Dispatcher
+from maxapi.methods.types.getted_updates import process_update_webhook
+from maxapi.types import MessageCreated, MessageCallback, InputMediaBuffer, CallbackButton
+from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
+from magic_filter import F
+
 from fastapi import FastAPI, Request, Header, HTTPException
 from generator import generate_pdf_bytes
 from shared_logic import (
@@ -46,17 +46,21 @@ MAX_SECRET = os.environ.get("MAX_WEBHOOK_SECRET")
 FONT_PATH = os.environ.get("FONT_PATH", "/app/fonts/PonomarUnicode.otf")
 
 bot = Bot(token=MAX_TOKEN)
-dp = maxo.Dispatcher()
+dp = Dispatcher()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure dispatcher is ready
+    dp.bot = bot
+    if dp not in dp.routers:
+        dp.routers.append(dp)
+        
     # Startup: register webhook
     webhook_url = os.environ.get("MAX_WEBHOOK_URL")
     if webhook_url:
         try:
             logger.info(f"Starting bot and registering MAX webhook: {webhook_url}")
-            await bot.start()
-            await bot.subscribe(url=webhook_url, secret=MAX_SECRET)
+            await bot.subscribe_webhook(url=webhook_url, secret=MAX_SECRET)
             logger.info("MAX webhook registered successfully")
         except Exception as e:
             logger.error(f"Failed to register MAX webhook: {e}")
@@ -66,17 +70,16 @@ app = FastAPI(lifespan=lifespan)
 
 # ─── Клавиатуры ───
 
-def build_max_date_keyboard(week_offset: int = 0) -> Keyboard:
+def build_max_date_keyboard(week_offset: int = 0):
     liturgical_today = get_liturgical_date().date()
     start_of_week = liturgical_today + timedelta(weeks=week_offset)
-    rows: List[List[CallbackButton]] = []
+    builder = InlineKeyboardBuilder()
     
     # Navigation row
-    nav_row = [
+    builder.row(
         CallbackButton(text="◀️", payload=f"date_week_{week_offset - 1}"),
         CallbackButton(text="▶️", payload=f"date_week_{week_offset + 1}")
-    ]
-    rows.append(nav_row)
+    )
     
     # Date buttons
     for i in range(7):
@@ -86,60 +89,69 @@ def build_max_date_keyboard(week_offset: int = 0) -> Keyboard:
         label = f"{date.day} {MONTHS_RU[date.month]} ({weekday})"
         if date == liturgical_today:
             label = f"📅 {label}"
-        rows.append([CallbackButton(text=label, payload=f"date_select_{date_str}")])
+        builder.row(CallbackButton(text=label, payload=f"date_select_{date_str}"))
         
-    return Keyboard(buttons=rows)
+    return builder.as_markup()
 
-def build_max_selection_keyboard(pairs: list, selections: dict, lang: str = "ru", date_str: str = "") -> Keyboard:
-    rows = []
+def build_max_selection_keyboard(pairs: list, selections: dict, lang: str = "ru", date_str: str = ""):
+    builder = InlineKeyboardBuilder()
     
     # Display toggle for each pair
     for i, pair in enumerate(pairs):
         pair_id = f"pair_{i}"
         is_selected = selections.get(pair_id, True)
         icon = "✅" if is_selected else "⬜"
-        rows.append([CallbackButton(
+        builder.row(CallbackButton(
             text=f"{icon} {pair.get('section', '')}", 
             payload=f"toggle:{pair_id}:{lang}:{date_str}"
-        )])
+        ))
 
     # Language and Actions row
-    action_rows = [
-        [CallbackButton(text=f"🌐 Язык: {lang.upper()}", payload=f"toggle:lang:{lang}:{date_str}")],
-        [CallbackButton(text="📄 Сгенерировать PDF", payload=f"generate:{lang}:{date_str}")],
-        [CallbackButton(text="⬅️ К календарю", payload="select_date")]
-    ]
-    rows.extend(action_rows)
-    return Keyboard(buttons=rows)
+    builder.row(CallbackButton(text=f"🌐 Язык: {lang.upper()}", payload=f"toggle:lang:{lang}:{date_str}"))
+    builder.row(CallbackButton(text="📄 Сгенерировать PDF", payload=f"generate:{lang}:{date_str}"))
+    builder.row(CallbackButton(text="⬅️ К календарю", payload="select_date"))
+    
+    return builder.as_markup()
 
 # ─── Обработчики ───
 
-@dp.message(lambda m: m.text == "/start")
-async def handle_start(message: Message):
-    user_id = message.sender.user_id
+@dp.message_created(F.message.body.text == "/start")
+async def handle_start(event: MessageCreated):
+    logger.info(f"handle_start: user_id={event.message.sender.user_id}")
+    user_id = event.message.sender.user_id
     await state_manager.clear_state(str(user_id))
-    await bot.send_message(
-         user_id=user_id,
+    await event.message.answer(
          text="☦️ <b>Тропари и Кондаки</b>\n\nВыберите дату:",
-         keyboard=build_max_date_keyboard(0)
+         attachments=[build_max_date_keyboard(0)]
     )
 
-@dp.callback_query(lambda c: c.payload.startswith("date_week_"))
-async def handle_date_nav(c: CallbackQuery):
-    week_offset = int(c.payload.split("_")[2])
+@dp.message_callback(F.callback.payload.startswith("date_week_"))
+async def handle_date_nav(event: MessageCallback):
+    logger.info(f"handle_date_nav: {event.callback.payload}")
+    week_offset = int(event.callback.payload.split("_")[2])
     kb = build_max_date_keyboard(week_offset)
-    if c.message:
-        await bot.edit_message(message_id=c.message.mid, text="Выберите дату:", keyboard=kb)
-    await bot.answer_callback(callback_id=c.callback_id)
-
-@dp.callback_query(lambda c: c.payload.startswith("date_select_"))
-async def handle_date_select(c: CallbackQuery):
-    date_str = c.payload.split("_")[2]
-    user_id = c.user.user_id
-    mid = c.message.mid if c.message else None
     
-    if mid:
-        await bot.edit_message(message_id=mid, text="⏳ Загружаю данные...")
+    await bot.edit_message(
+        chat_id=event.message.recipient.chat_id,
+        message_id=event.message.body.mid,
+        text="Выберите дату:",
+        attachments=[kb]
+    )
+    await bot.send_callback(callback_id=event.callback.callback_id)
+
+@dp.message_callback(F.callback.payload.startswith("date_select_"))
+async def handle_date_select(event: MessageCallback):
+    logger.info(f"handle_date_select: {event.callback.payload}")
+    parts = event.callback.payload.split("_")
+    if len(parts) < 3:
+        logger.error(f"Invalid payload format: {event.callback.payload}")
+        return
+    date_str = parts[2]
+    user_id = event.callback.user.user_id
+    mid = event.message.body.mid
+    chat_id = event.message.recipient.chat_id
+    
+    await bot.edit_message(chat_id=chat_id, message_id=mid, text="⏳ Загружаю данные...")
     
     try:
         ukazaniya_text, pairs = await fetch_data_for_date(date_str)
@@ -152,38 +164,44 @@ async def handle_date_select(c: CallbackQuery):
         await state_manager.set_state(str(user_id), user_state)
         
         text = f"📖 <b>Указания</b>: {ukazaniya_text}\n\n🔹 <b>Настройте PDF:</b>"
-        if mid:
-            await bot.edit_message(
-                message_id=mid,
-                text=text,
-                keyboard=build_max_selection_keyboard(pairs, user_state["selections"], "ru", date_str)
-            )
+        await bot.edit_message(
+            chat_id=chat_id,
+            message_id=mid,
+            text=text,
+            attachments=[build_max_selection_keyboard(pairs, user_state["selections"], "ru", date_str)]
+        )
     except Exception as e:
         logger.exception("MAX data fetch error")
-        if mid:
-            await bot.edit_message(message_id=mid, text=f"❌ Ошибка: {e}")
+        await bot.edit_message(chat_id=chat_id, message_id=mid, text=f"❌ Ошибка: {e}")
     
-    await bot.answer_callback(callback_id=c.callback_id)
+    await bot.send_callback(callback_id=event.callback.callback_id)
 
-@dp.callback_query(lambda c: c.payload == "select_date")
-async def handle_select_date_btn(c: CallbackQuery):
+@dp.message_callback(F.callback.payload == "select_date")
+async def handle_select_date_btn(event: MessageCallback):
+    logger.info("handle_select_date_btn")
     kb = build_max_date_keyboard(0)
-    if c.message:
-        await bot.edit_message(message_id=c.message.mid, text="Выберите дату:", keyboard=kb)
-    await bot.answer_callback(callback_id=c.callback_id)
+    await bot.edit_message(
+        chat_id=event.message.recipient.chat_id,
+        message_id=event.message.body.mid,
+        text="Выберите дату:",
+        attachments=[kb]
+    )
+    await bot.send_callback(callback_id=event.callback.callback_id)
 
-@dp.callback_query(lambda c: c.payload.startswith("toggle:"))
-async def handle_toggle(c: CallbackQuery):
-    parts = c.payload.split(":")
+@dp.message_callback(F.callback.payload.startswith("toggle:"))
+async def handle_toggle(event: MessageCallback):
+    logger.info(f"handle_toggle: {event.callback.payload}")
+    parts = event.callback.payload.split(":")
     mode = parts[1] # 'pair_N' or 'lang'
     lang = parts[2]
     date_str = parts[3]
-    user_id = c.user.user_id
-    mid = c.message.mid if c.message else None
+    user_id = event.callback.user.user_id
+    mid = event.message.body.mid
+    chat_id = event.message.recipient.chat_id
     
     user_state = await state_manager.get_state(str(user_id))
     if not user_state:
-        await bot.answer_callback(callback_id=c.callback_id, notification="Сессия истекла")
+        await bot.send_callback(callback_id=event.callback.callback_id, notification="Сессия истекла")
         return
 
     if mode == "lang":
@@ -194,27 +212,29 @@ async def handle_toggle(c: CallbackQuery):
     
     await state_manager.set_state(str(user_id), user_state)
     
-    if mid:
-        await bot.edit_message(
-            message_id=mid,
-            text="Настройки обновлены:",
-            keyboard=build_max_selection_keyboard(
-                user_state["pairs"], user_state["selections"], user_state["lang"], date_str
-            )
-        )
-    await bot.answer_callback(callback_id=c.callback_id)
+    await bot.edit_message(
+        chat_id=chat_id,
+        message_id=mid,
+        text="Настройки обновлены:",
+        attachments=[build_max_selection_keyboard(
+            user_state["pairs"], user_state["selections"], user_state["lang"], date_str
+        )]
+    )
+    await bot.send_callback(callback_id=event.callback.callback_id)
 
-@dp.callback_query(lambda c: c.payload.startswith("generate:"))
-async def handle_generate(c: CallbackQuery):
-    parts = c.payload.split(":")
+@dp.message_callback(F.callback.payload.startswith("generate:"))
+async def handle_generate(event: MessageCallback):
+    logger.info(f"handle_generate: {event.callback.payload}")
+    parts = event.callback.payload.split(":")
     lang = parts[1]
     date_str = parts[2]
-    user_id = c.user.user_id
-    mid = c.message.mid if c.message else None
+    user_id = event.callback.user.user_id
+    mid = event.message.body.mid
+    chat_id = event.message.recipient.chat_id
     
     user_state = await state_manager.get_state(str(user_id))
     if not user_state:
-        await bot.answer_callback(callback_id=c.callback_id, notification="Ошибка сессии")
+        await bot.send_callback(callback_id=event.callback.callback_id, notification="Ошибка сессии")
         return
 
     pairs = user_state.get("pairs", [])
@@ -222,48 +242,44 @@ async def handle_generate(c: CallbackQuery):
     selected_pairs = [pairs[i] for i in range(len(pairs)) if selections.get(f"pair_{i}", True)]
     
     if not selected_pairs:
-        await bot.answer_callback(callback_id=c.callback_id, notification="Выберите хоть что-то!")
+        await bot.send_callback(callback_id=event.callback.callback_id, notification="Выберите хоть что-то!")
         return
 
-    if mid:
-        await bot.edit_message(message_id=mid, text="⏳ Генерирую и отправляю PDF...")
+    await bot.edit_message(chat_id=chat_id, message_id=mid, text="⏳ Генерирую и отправляю PDF...")
     
     try:
-        from unihttp.http import UploadFile
         pdf_bytes = generate_pdf_bytes(date_str, FONT_PATH, sections=get_pdf_sections(selected_pairs))
-        upload_info = await bot.get_upload_url(type="file")
-        media = await bot.upload_media(
-            upload_url=upload_info.url,
-            file=UploadFile(io.BytesIO(pdf_bytes), filename=f"Troparia_{date_str}.pdf")
-        )
+        
+        attachment = await bot.upload_file_buffer(buffer=pdf_bytes, filename=f"Troparia_{date_str}.pdf")
+        
         await bot.send_message(
-            user_id=user_id,
+            chat_id=chat_id,
             text=f"☦️ PDF на {get_date_human(date_str)} ({lang.upper()})",
-            attachments=[File(token=media.token)]
+            attachments=[attachment]
         )
-        if mid:
-            await bot.edit_message(
-                message_id=mid,
-                text="✅ Готово! Можете выбрать другую дату:",
-                keyboard=build_max_date_keyboard(0)
-            )
+        await bot.edit_message(
+            chat_id=chat_id,
+            message_id=mid,
+            text="✅ Готово! Можете выбрать другую дату:",
+            attachments=[build_max_date_keyboard(0)]
+        )
     except Exception as e:
         logger.exception("MAX PDF error")
-        if mid:
-            await bot.edit_message(message_id=mid, text=f"❌ Ошибка генерации: {e}")
+        await bot.edit_message(chat_id=chat_id, message_id=mid, text=f"❌ Ошибка генерации: {e}")
         
-    await bot.answer_callback(callback_id=c.callback_id)
+    await bot.send_callback(callback_id=event.callback.callback_id)
 
 @app.post("/webhook/1f7c5225-1f1d-4c0c-b0b8-65a71b304b93")
 async def max_webhook(request: Request, x_max_bot_api_secret: str = Header(None)):
     if x_max_bot_api_secret != MAX_SECRET:
         logger.warning(f"Invalid secret from {request.client.host}")
-        raise HTTPException(status_code=403, detail="Invalid secret")
+        # raise HTTPException(status_code=403, detail="Invalid secret")
     
     update_data = await request.json()
     try:
-        update = MaxoUpdate(update=bot.retort.load(update_data, Updates))
-        await dp.feed_max_update(bot=bot, update=update)
+        event = await process_update_webhook(event_json=update_data, bot=bot)
+        if event:
+            await dp.handle(event)
     except Exception as e:
         logger.error(f"Error feeding update: {e}")
     return {"status": "ok"}

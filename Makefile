@@ -1,7 +1,10 @@
-.PHONY: test deploy logs ps
+.PHONY: test deploy logs ps clean-test
 
 test:
-	python3 -m pytest --cov=. tests/
+	docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm max-bot-test
+
+clean-test:
+	docker compose -f docker-compose.yml -f docker-compose.test.yml down -v
 
 deploy: test
 	git add .

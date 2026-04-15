@@ -5,7 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2026-04-15
+
+### Changed
+- **Migrated from maxo to maxapi**: Replaced the previous `maxo` library with the official `maxapi` (`max-messenger-client/max-botapi-python`) for improved reliability and better alignment with MAX messenger standards.
+- **Improved Dispatcher Logic**: Updated `max_bot.py` to use `maxapi.Dispatcher` with `magic_filter` (F) for robust and precise event routing.
+- **Enhanced Keyboard Construction**: Switched to `InlineKeyboardBuilder` for cleaner and more maintainable keyboard layouts.
+- **Updated Test Infrastructure**: Refactored the MAX bot test suite to be fully compatible with `maxapi` event models and method signatures.
+- **File Upload Optimization**: Integrated `bot.upload_file_buffer` for more efficient PDF document delivery.
+
+## [1.1.1] - 2026-04-11
 
 ### Added
 - **maxo library integration**: Migrated `max_bot.py` from manual `httpx` logic to `maxo` library for a more robust, event-driven architecture.
