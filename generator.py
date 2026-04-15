@@ -573,7 +573,8 @@ class _TwoUpRenderer:
         for part in block["parts"]:
             if part["kind"] == "heading":
                 part_h = _heading_h(part["text"], self.fs)
-                self._ensure(part_h)
+                # Ensure heading + small buffer (e.g. 2 lines of next item)
+                self._ensure(part_h + 2 * self.lh)
                 
                 z = self.z
                 self.c.setFont(FONT_NAME, self.fs)
@@ -586,7 +587,11 @@ class _TwoUpRenderer:
                 
             elif part["kind"] == "item":
                 # Label (always centered, one line)
-                self._ensure(self.lh + GAP_ITEM)  # Проверяем место для label + gap
+                # Ensure label + at least 3 lines of text (or all if shorter)
+                keep_lines = min(part.get("text_lines", 0), 3)
+                item_min_h = self.lh + keep_lines * self.lh + GAP_ITEM
+                self._ensure(item_min_h)
+                
                 self._centered(part["label"], COLOR_RED)
                 # self.y уже уменьшен на self.lh в _centered
                 
