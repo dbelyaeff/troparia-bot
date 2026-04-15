@@ -107,22 +107,44 @@ def build_max_date_keyboard(week_offset: int = 0):
     start_of_week = liturgical_today + timedelta(weeks=week_offset)
     builder = InlineKeyboardBuilder()
     
-    # Navigation row
-    builder.row(
-        CallbackButton(text="◀️", payload=f"date_week_{week_offset - 1}"),
-        CallbackButton(text="▶️", payload=f"date_week_{week_offset + 1}")
-    )
+    # 1. Collect all buttons first
+    buttons = []
+    today_btn = None
     
-    # Date buttons
     for i in range(7):
         date = start_of_week + timedelta(days=i)
         date_str = date.strftime("%Y-%m-%d")
         weekday = DAYS_RU[date.weekday()]
         label = f"{date.day} {MONTHS_RU[date.month]} ({weekday})"
-        if date == liturgical_today:
-            label = f"📅 {label}"
-        builder.row(CallbackButton(text=label, payload=f"date_select_{date_str}"))
         
+        btn = CallbackButton(text=label, payload=f"date_select_{date_str}")
+        
+        if date == liturgical_today:
+            btn.text = f"📅 {label}"
+            today_btn = btn
+        else:
+            buttons.append(btn)
+            
+    # 2. Build rows
+    # Highlight today as a separate row
+    if today_btn:
+        builder.row(today_btn)
+    else:
+        # If today is not in this week, make the first date a row for consistency
+        if buttons:
+            builder.row(buttons.pop(0))
+            
+    # Add others in pairs
+    for i in range(0, len(buttons), 2):
+        pair = buttons[i:i+2]
+        builder.row(*pair)
+        
+    # 3. Navigation at the bottom
+    builder.row(
+        CallbackButton(text="◀️", payload=f"date_week_{week_offset - 1}"),
+        CallbackButton(text="▶️", payload=f"date_week_{week_offset + 1}")
+    )
+    
     return builder.as_markup()
 
 def build_max_selection_keyboard(pairs: list, selections: dict, date_str: str = ""):
