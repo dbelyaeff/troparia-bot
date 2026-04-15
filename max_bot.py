@@ -164,7 +164,6 @@ async def handle_date_nav(event: MessageCallback):
     kb = build_max_date_keyboard(week_offset)
     
     await bot.edit_message(
-        chat_id=event.message.recipient.chat_id,
         message_id=event.message.body.mid,
         text="Выберите дату:",
         attachments=[kb]
@@ -183,7 +182,7 @@ async def handle_date_select(event: MessageCallback):
     mid = event.message.body.mid
     chat_id = event.message.recipient.chat_id
     
-    await bot.edit_message(chat_id=chat_id, message_id=mid, text="⏳ Загружаю данные...")
+    await bot.edit_message(message_id=mid, text="⏳ Загружаю данные...")
     
     try:
         ukazaniya_text, pairs = await fetch_data_for_date(date_str)
@@ -197,14 +196,13 @@ async def handle_date_select(event: MessageCallback):
         
         text = f"📖 <b>Указания</b>: {ukazaniya_text}\n\n🔹 <b>Настройте PDF:</b>"
         await bot.edit_message(
-            chat_id=chat_id,
             message_id=mid,
             text=text,
             attachments=[build_max_selection_keyboard(pairs, user_state["selections"], "ru", date_str)]
         )
     except Exception as e:
         logger.exception("MAX data fetch error")
-        await bot.edit_message(chat_id=chat_id, message_id=mid, text=f"❌ Ошибка: {e}")
+        await bot.edit_message(message_id=mid, text=f"❌ Ошибка: {e}")
     
     await bot.send_callback(callback_id=event.callback.callback_id)
 
@@ -213,7 +211,6 @@ async def handle_select_date_btn(event: MessageCallback):
     logger.info("handle_select_date_btn")
     kb = build_max_date_keyboard(0)
     await bot.edit_message(
-        chat_id=event.message.recipient.chat_id,
         message_id=event.message.body.mid,
         text="Выберите дату:",
         attachments=[kb]
@@ -245,7 +242,6 @@ async def handle_toggle(event: MessageCallback):
     await state_manager.set_state(str(user_id), user_state)
     
     await bot.edit_message(
-        chat_id=chat_id,
         message_id=mid,
         text="Настройки обновлены:",
         attachments=[build_max_selection_keyboard(
@@ -277,7 +273,7 @@ async def handle_generate(event: MessageCallback):
         await bot.send_callback(callback_id=event.callback.callback_id, notification="Выберите хоть что-то!")
         return
 
-    await bot.edit_message(chat_id=chat_id, message_id=mid, text="⏳ Генерирую и отправляю PDF...")
+    await bot.edit_message(message_id=mid, text="⏳ Генерирую и отправляю PDF...")
     
     try:
         pdf_bytes = generate_pdf_bytes(date_str, FONT_PATH, sections=get_pdf_sections(selected_pairs))
@@ -290,14 +286,13 @@ async def handle_generate(event: MessageCallback):
             attachments=[attachment]
         )
         await bot.edit_message(
-            chat_id=chat_id,
             message_id=mid,
-            text="✅ Готово! Можете выбрать другую дату:",
+            text="✅ PDF успешно отправлен! Можете выбрать другую дату:",
             attachments=[build_max_date_keyboard(0)]
         )
     except Exception as e:
         logger.exception("MAX PDF error")
-        await bot.edit_message(chat_id=chat_id, message_id=mid, text=f"❌ Ошибка генерации: {e}")
+        await bot.edit_message(message_id=mid, text=f"❌ Ошибка генерации: {e}")
         
     await bot.send_callback(callback_id=event.callback.callback_id)
 
