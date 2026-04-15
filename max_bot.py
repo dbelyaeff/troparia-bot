@@ -125,7 +125,7 @@ def build_max_date_keyboard(week_offset: int = 0):
         
     return builder.as_markup()
 
-def build_max_selection_keyboard(pairs: list, selections: dict, lang: str = "ru", date_str: str = ""):
+def build_max_selection_keyboard(pairs: list, selections: dict, date_str: str = ""):
     builder = InlineKeyboardBuilder()
     
     # Display toggle for each pair
@@ -135,12 +135,11 @@ def build_max_selection_keyboard(pairs: list, selections: dict, lang: str = "ru"
         icon = "✅" if is_selected else "⬜"
         builder.row(CallbackButton(
             text=f"{icon} {pair.get('section', '')}", 
-            payload=f"toggle:{pair_id}:{lang}:{date_str}"
+            payload=f"toggle:{pair_id}:{date_str}"
         ))
 
-    # Language and Actions row
-    builder.row(CallbackButton(text=f"🌐 Язык: {lang.upper()}", payload=f"toggle:lang:{lang}:{date_str}"))
-    builder.row(CallbackButton(text="📄 Сгенерировать PDF", payload=f"generate:{lang}:{date_str}"))
+    # Actions row
+    builder.row(CallbackButton(text="📄 Сгенерировать PDF", payload=f"generate:{date_str}"))
     builder.row(CallbackButton(text="⬅️ К календарю", payload="select_date"))
     
     return builder.as_markup()
@@ -198,7 +197,7 @@ async def handle_date_select(event: MessageCallback):
         await bot.edit_message(
             message_id=mid,
             text=text,
-            attachments=[build_max_selection_keyboard(pairs, user_state["selections"], "ru", date_str)]
+            attachments=[build_max_selection_keyboard(pairs, user_state["selections"], date_str)]
         )
     except Exception as e:
         logger.exception("MAX data fetch error")
@@ -221,9 +220,8 @@ async def handle_select_date_btn(event: MessageCallback):
 async def handle_toggle(event: MessageCallback):
     logger.info(f"handle_toggle: {event.callback.payload}")
     parts = event.callback.payload.split(":")
-    mode = parts[1] # 'pair_N' or 'lang'
-    lang = parts[2]
-    date_str = parts[3]
+    mode = parts[1] # 'pair_N'
+    date_str = parts[2]
     user_id = event.callback.user.user_id
     mid = event.message.body.mid
     chat_id = event.message.recipient.chat_id
@@ -233,9 +231,7 @@ async def handle_toggle(event: MessageCallback):
         await bot.send_callback(callback_id=event.callback.callback_id, notification="Сессия истекла")
         return
 
-    if mode == "lang":
-        user_state["lang"] = "en" if lang == "ru" else "ru"
-    elif mode.startswith("pair_"):
+    if mode.startswith("pair_"):
         selections = user_state.get("selections", {})
         selections[mode] = not selections.get(mode, True)
     
@@ -245,7 +241,7 @@ async def handle_toggle(event: MessageCallback):
         message_id=mid,
         text="Настройки обновлены:",
         attachments=[build_max_selection_keyboard(
-            user_state["pairs"], user_state["selections"], user_state["lang"], date_str
+            user_state["pairs"], user_state["selections"], date_str
         )]
     )
     await bot.send_callback(callback_id=event.callback.callback_id)
@@ -254,8 +250,7 @@ async def handle_toggle(event: MessageCallback):
 async def handle_generate(event: MessageCallback):
     logger.info(f"handle_generate: {event.callback.payload}")
     parts = event.callback.payload.split(":")
-    lang = parts[1]
-    date_str = parts[2]
+    date_str = parts[1]
     user_id = event.callback.user.user_id
     mid = event.message.body.mid
     chat_id = event.message.recipient.chat_id
@@ -278,11 +273,12 @@ async def handle_generate(event: MessageCallback):
     try:
         pdf_bytes = generate_pdf_bytes(date_str, FONT_PATH, sections=get_pdf_sections(selected_pairs))
         
-        attachment = await bot.upload_file_buffer(buffer=pdf_bytes, filename=f"Troparia_{date_str}.pdf")
+        # Use InputMediaBuffer for automated upload
+        attachment = InputMediaBuffer(buffer=pdf_bytes, filename=f"Troparia_{date_str}.pdf")
         
         await bot.send_message(
             chat_id=chat_id,
-            text=f"☦️ PDF на {get_date_human(date_str)} ({lang.upper()})",
+            text=f"☦️ PDF на {get_date_human(date_str)}",
             attachments=[attachment]
         )
         await bot.edit_message(
