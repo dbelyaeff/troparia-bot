@@ -9,6 +9,34 @@ from maxapi import Bot, Dispatcher
 from maxapi.methods.types.getted_updates import process_update_webhook
 from maxapi.types import MessageCreated, MessageCallback, InputMediaBuffer, CallbackButton
 from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
+# ─── Monkeypatch maxapi ───
+# The library uses deprecated access_token query param and wrong default URL.
+# We fix it here to avoid maintainance overhead of a local fork.
+import maxapi.connection.base
+import maxapi.bot
+
+_original_request = maxapi.connection.base.BaseConnection.request
+
+async def _patched_request(self, method, path, model=None, is_return_raw=False, **kwargs):
+    # Ensure headers include Authorization: <token>
+    headers = kwargs.get('headers', {})
+    # maxapi.Bot stores token in self.__token -> _Bot__token
+    token = getattr(self.bot, '_Bot__token', None) if self.bot else None
+    if token:
+        headers['Authorization'] = token
+    kwargs['headers'] = headers
+    
+    # Remove deprecated access_token from query params
+    params = kwargs.get('params', {})
+    if isinstance(params, dict) and 'access_token' in params:
+        params = params.copy()
+        del params['access_token']
+    kwargs['params'] = params
+    
+    return await _original_request(self, method, path, model, is_return_raw, **kwargs)
+
+maxapi.connection.base.BaseConnection.request = _patched_request
+
 from magic_filter import F
 
 from fastapi import FastAPI, Request, Header, HTTPException
@@ -46,6 +74,7 @@ MAX_SECRET = os.environ.get("MAX_WEBHOOK_SECRET")
 FONT_PATH = os.environ.get("FONT_PATH", "/app/fonts/PonomarUnicode.otf")
 
 bot = Bot(token=MAX_TOKEN)
+bot.API_URL = 'https://platform-api.max.ru'
 dp = Dispatcher()
 
 @asynccontextmanager
@@ -60,8 +89,9 @@ async def lifespan(app: FastAPI):
     if webhook_url:
         try:
             logger.info(f"Starting bot and registering MAX webhook: {webhook_url}")
-            await bot.subscribe_webhook(url=webhook_url, secret=MAX_SECRET)
-            logger.info("MAX webhook registered successfully")
+            # Use subscribe_webhook instead of subscribe
+            res = await bot.subscribe_webhook(url=webhook_url, secret=MAX_SECRET)
+            logger.info(f"MAX webhook registration response: {res}")
         except Exception as e:
             logger.error(f"Failed to register MAX webhook: {e}")
     yield

@@ -21,6 +21,7 @@ Welcome to the Troparia Bot project! To maintain consistency and reliable deploy
 
 ## 4. Safety
 - Do not run `docker compose` locally while production is active if it shares resources or state (though currently stateless).
+- **No Local Instances**: Do not run the bot on your local machine if it's already running on the server. Only one instance should be active at a time to prevent conflicts (e.g., both instances receiving the same updates or clashing webhook registrations).
 - Always check remote logs with `make logs` after deployment.
 
 ## 5. Webhook Security
