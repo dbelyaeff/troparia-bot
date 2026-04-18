@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from maxapi import Bot, Dispatcher
 from maxapi.methods.types.getted_updates import process_update_webhook
-from maxapi.types import MessageCreated, MessageCallback, InputMediaBuffer, CallbackButton
+from maxapi.types import MessageCreated, MessageCallback, InputMediaBuffer, CallbackButton, MessageButton
 from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
 from maxapi.enums.parse_mode import ParseMode
 # ─── Monkeypatch maxapi ───
@@ -117,7 +117,7 @@ def build_max_date_keyboard(week_offset: int = 0):
         weekday = DAYS_RU[date.weekday()]
         label = f"{date.day} {MONTHS_RU[date.month]} ({weekday})"
         
-        btn = CallbackButton(text=label, payload=f"date_select_{date_str}")
+        btn = MessageButton(text=label)
         
         if date == liturgical_today:
             btn.text = f"📅 {label}"
@@ -161,8 +161,8 @@ def build_max_selection_keyboard(pairs: list, selections: dict, date_str: str = 
         ))
 
     # Actions row
-    builder.row(CallbackButton(text="📄 Сгенерировать PDF", payload=f"generate:{date_str}"))
-    builder.row(CallbackButton(text="⬅️ К календарю", payload="select_date"))
+    builder.row(MessageButton(text="📄 Сгенерировать PDF"))
+    builder.row(MessageButton(text="⬅️ К календарю"))
     
     return builder.as_markup()
 
@@ -177,6 +177,103 @@ async def handle_start(event: MessageCreated):
          text="☦️ <b>Тропари и Кондаки</b>\n\nВыберите дату:",
          attachments=[build_max_date_keyboard(0)]
     )
+
+@dp.message_created(F.message.body.text == "⬅️ К календарю")
+async def handle_back_to_calendar(event: MessageCreated):
+    logger.info("handle_back_to_calendar via text")
+    await handle_start(event)
+
+@dp.message_created(F.message.body.text == "📄 Сгенерировать PDF")
+async def handle_generate_text(event: MessageCreated):
+    logger.info("handle_generate_text")
+    user_id = event.message.sender.user_id
+    user_state = await state_manager.get_state(str(user_id))
+    if not user_state:
+        await event.message.answer("Сессия истекла. Начните сначала: /start")
+        return
+    
+    date_str = user_state.get("selected_date")
+    chat_id = event.message.recipient.chat_id
+    
+    # Реюзаем логику из handle_generate
+    # Но нам нужен объект события с payload. Или мы можем просто вызвать функцию.
+    # Для простоты скопируем или вынесем логику.
+    # Пока вызовем напрямую с фейковым событием или аналогичной логикой.
+    await perform_generate(chat_id, user_id, date_str, user_state)
+
+async def perform_generate(chat_id, user_id, date_str, user_state):
+    pairs = user_state.get("pairs", [])
+    selections = user_state.get("selections", {})
+    selected_pairs = [pairs[i] for i in range(len(pairs)) if selections.get(f"pair_{i}", True)]
+    
+    if not selected_pairs:
+        await bot.send_message(chat_id=chat_id, text="Выберите хоть что-то!")
+        return
+
+    wait_msg = await bot.send_message(chat_id=chat_id, text="⏳ Генерирую и отправляю PDF...")
+    
+    try:
+        pdf_bytes = generate_pdf_bytes(date_str, FONT_PATH, sections=get_pdf_sections(selected_pairs))
+        attachment = InputMediaBuffer(buffer=pdf_bytes, filename=f"Troparia_{date_str}.pdf")
+        
+        await bot.send_message(
+            chat_id=chat_id,
+            text=f"☦️ PDF на {get_date_human(date_str)}",
+            attachments=[attachment]
+        )
+        await bot.send_message(
+            chat_id=chat_id,
+            text="✅ PDF успешно отправлен! Можете выбрать другую дату:",
+            attachments=[build_max_date_keyboard(0)]
+        )
+    except Exception as e:
+        logger.exception("MAX PDF error")
+        await bot.send_message(chat_id=chat_id, text=f"❌ Ошибка генерации: {e}")
+
+@dp.message_created(F.message.body.text.regexp(r'^\d+\s+[а-я]+\s+\([А-Я][а-я]\)$') | F.message.body.text.regexp(r'^📅\s+\d+\s+[а-я]+\s+\([А-Я][а-я]\)$'))
+async def handle_date_text(event: MessageCreated):
+    logger.info(f"handle_date_text: {event.message.body.text}")
+    text = event.message.body.text.replace("📅 ", "").strip()
+    
+    # Нам нужно понять, какая это дата.
+    # Простейший способ: переберем даты вокруг сегодня и найдем совпадение по тексту.
+    liturgical_today = get_liturgical_date().date()
+    target_date = None
+    
+    # Ищем в диапазоне +/- 30 дней
+    for i in range(-30, 31):
+        d = liturgical_today + timedelta(days=i)
+        label = f"{d.day} {MONTHS_RU[d.month]} ({DAYS_RU[d.weekday()]})"
+        if label == text:
+            target_date = d.strftime("%Y-%m-%d")
+            break
+            
+    if target_date:
+        await process_date_selection(event.message.recipient.chat_id, event.message.sender.user_id, target_date)
+    else:
+        logger.warning(f"Could not parse date text: {text}")
+
+async def process_date_selection(chat_id, user_id, date_str):
+    wait_msg = await bot.send_message(chat_id=chat_id, text="⏳ Загружаю данные...")
+    try:
+        ukazaniya_text, pairs = await fetch_data_for_date(date_str)
+        user_state = {
+            "selected_date": date_str,
+            "pairs": pairs,
+            "selections": {f"pair_{i}": True for i in range(len(pairs))},
+            "lang": "ru"
+        }
+        await state_manager.set_state(str(user_id), user_state)
+        
+        text = f"📖 <b>Указания</b>: {ukazaniya_text}\n\n🔹 <b>Настройте PDF:</b>"
+        await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            attachments=[build_max_selection_keyboard(pairs, user_state["selections"], date_str)]
+        )
+    except Exception as e:
+        logger.exception("MAX data fetch error")
+        await bot.send_message(chat_id=chat_id, text=f"❌ Ошибка: {e}")
 
 @dp.message_callback(F.callback.payload.startswith("date_week_"))
 async def handle_date_nav(event: MessageCallback):
@@ -195,47 +292,12 @@ async def handle_date_nav(event: MessageCallback):
 async def handle_date_select(event: MessageCallback):
     logger.info(f"handle_date_select: {event.callback.payload}")
     parts = event.callback.payload.split("_")
-    if len(parts) < 3:
-        logger.error(f"Invalid payload format: {event.callback.payload}")
-        return
+    if len(parts) < 3: return
     date_str = parts[2]
     user_id = event.callback.user.user_id
-    mid = event.message.body.mid
     chat_id = event.message.recipient.chat_id
     
-    await bot.edit_message(message_id=mid, text="⏳ Загружаю данные...")
-    
-    try:
-        ukazaniya_text, pairs = await fetch_data_for_date(date_str)
-        user_state = {
-            "selected_date": date_str,
-            "pairs": pairs,
-            "selections": {f"pair_{i}": True for i in range(len(pairs))},
-            "lang": "ru"
-        }
-        await state_manager.set_state(str(user_id), user_state)
-        
-        text = f"📖 <b>Указания</b>: {ukazaniya_text}\n\n🔹 <b>Настройте PDF:</b>"
-        await bot.edit_message(
-            message_id=mid,
-            text=text,
-            attachments=[build_max_selection_keyboard(pairs, user_state["selections"], date_str)]
-        )
-    except Exception as e:
-        logger.exception("MAX data fetch error")
-        await bot.edit_message(message_id=mid, text=f"❌ Ошибка: {e}")
-    
-    await bot.send_callback(callback_id=event.callback.callback_id)
-
-@dp.message_callback(F.callback.payload == "select_date")
-async def handle_select_date_btn(event: MessageCallback):
-    logger.info("handle_select_date_btn")
-    kb = build_max_date_keyboard(0)
-    await bot.edit_message(
-        message_id=event.message.body.mid,
-        text="Выберите дату:",
-        attachments=[kb]
-    )
+    await process_date_selection(chat_id, user_id, date_str)
     await bot.send_callback(callback_id=event.callback.callback_id)
 
 @dp.message_callback(F.callback.payload.startswith("toggle:"))
@@ -246,7 +308,6 @@ async def handle_toggle(event: MessageCallback):
     date_str = parts[2]
     user_id = event.callback.user.user_id
     mid = event.message.body.mid
-    chat_id = event.message.recipient.chat_id
     
     user_state = await state_manager.get_state(str(user_id))
     if not user_state:
@@ -274,7 +335,6 @@ async def handle_generate(event: MessageCallback):
     parts = event.callback.payload.split(":")
     date_str = parts[1]
     user_id = event.callback.user.user_id
-    mid = event.message.body.mid
     chat_id = event.message.recipient.chat_id
     
     user_state = await state_manager.get_state(str(user_id))
@@ -282,36 +342,7 @@ async def handle_generate(event: MessageCallback):
         await bot.send_callback(callback_id=event.callback.callback_id, notification="Ошибка сессии")
         return
 
-    pairs = user_state.get("pairs", [])
-    selections = user_state.get("selections", {})
-    selected_pairs = [pairs[i] for i in range(len(pairs)) if selections.get(f"pair_{i}", True)]
-    
-    if not selected_pairs:
-        await bot.send_callback(callback_id=event.callback.callback_id, notification="Выберите хоть что-то!")
-        return
-
-    await bot.edit_message(message_id=mid, text="⏳ Генерирую и отправляю PDF...")
-    
-    try:
-        pdf_bytes = generate_pdf_bytes(date_str, FONT_PATH, sections=get_pdf_sections(selected_pairs))
-        
-        # Use InputMediaBuffer for automated upload
-        attachment = InputMediaBuffer(buffer=pdf_bytes, filename=f"Troparia_{date_str}.pdf")
-        
-        await bot.send_message(
-            chat_id=chat_id,
-            text=f"☦️ PDF на {get_date_human(date_str)}",
-            attachments=[attachment]
-        )
-        await bot.edit_message(
-            message_id=mid,
-            text="✅ PDF успешно отправлен! Можете выбрать другую дату:",
-            attachments=[build_max_date_keyboard(0)]
-        )
-    except Exception as e:
-        logger.exception("MAX PDF error")
-        await bot.edit_message(message_id=mid, text=f"❌ Ошибка генерации: {e}")
-        
+    await perform_generate(chat_id, user_id, date_str, user_state)
     await bot.send_callback(callback_id=event.callback.callback_id)
 
 @app.post("/webhook/1f7c5225-1f1d-4c0c-b0b8-65a71b304b93")

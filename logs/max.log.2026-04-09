@@ -1,0 +1,196 @@
+2026-04-09 15:27:33,152 [INFO] Sent message to 1: None
+2026-04-09 15:27:33,157 [INFO] Registering MAX webhook: https://example.com/webhook/max
+2026-04-09 15:27:33,158 [INFO] MAX webhook registered successfully
+2026-04-09 15:27:33,162 [INFO] Received MAX update: message_created
+2026-04-09 15:27:33,164 [INFO] Sent message to 123: None
+2026-04-09 15:27:33,165 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:33,166 [INFO] Edited message None
+2026-04-09 15:27:33,168 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:33,169 [INFO] Edited message None
+2026-04-09 15:27:33,170 [INFO] Edited message None
+2026-04-09 15:27:33,171 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:33,172 [INFO] Edited message None
+2026-04-09 15:27:33,173 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:33,173 [INFO] Edited message None
+2026-04-09 15:27:33,175 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:33,175 [INFO] Edited message None
+2026-04-09 15:27:33,175 [ERROR] MAX PDF error
+Traceback (most recent call last):
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 296, in max_webhook
+    token = await max_client.upload_file(pdf_bytes, f"Troparia_{date_str}.pdf")
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 110, in upload_file
+    upload_url = resp.json()["url"]
+KeyError: 'url'
+2026-04-09 15:27:33,180 [INFO] Edited message None
+2026-04-09 15:27:33,183 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:33,183 [INFO] Edited message None
+2026-04-09 15:27:33,196 [WARNING] Invalid secret from testclient
+2026-04-09 15:27:35,780 [INFO] Sent message to 1: None
+2026-04-09 15:27:35,786 [INFO] Registering MAX webhook: https://example.com/webhook/max
+2026-04-09 15:27:35,787 [INFO] MAX webhook registered successfully
+2026-04-09 15:27:35,793 [INFO] Received MAX update: message_created
+2026-04-09 15:27:35,794 [INFO] Sent message to 123: None
+2026-04-09 15:27:35,796 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:35,797 [INFO] Edited message None
+2026-04-09 15:27:35,798 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:35,799 [INFO] Edited message None
+2026-04-09 15:27:35,799 [INFO] Edited message None
+2026-04-09 15:27:35,800 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:35,801 [INFO] Edited message None
+2026-04-09 15:27:35,802 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:35,802 [INFO] Edited message None
+2026-04-09 15:27:35,804 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:35,804 [INFO] Edited message None
+2026-04-09 15:27:35,804 [ERROR] MAX PDF error
+Traceback (most recent call last):
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 296, in max_webhook
+    token = await max_client.upload_file(pdf_bytes, f"Troparia_{date_str}.pdf")
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 110, in upload_file
+    upload_url = resp.json()["url"]
+KeyError: 'url'
+2026-04-09 15:27:35,807 [INFO] Edited message None
+2026-04-09 15:27:35,808 [INFO] Received MAX update: message_callback
+2026-04-09 15:27:35,808 [INFO] Edited message None
+2026-04-09 15:27:35,814 [WARNING] Invalid secret from testclient
+2026-04-09 15:43:36,742 [INFO] Sent message to 1: None
+2026-04-09 15:43:36,747 [INFO] Registering MAX webhook: https://example.com/webhook/max
+2026-04-09 15:43:36,748 [INFO] MAX webhook registered successfully
+2026-04-09 15:43:36,753 [INFO] Received MAX update: message_created
+2026-04-09 15:43:36,754 [INFO] Sent message to 123: None
+2026-04-09 15:43:36,755 [INFO] Received MAX update: message_callback
+2026-04-09 15:43:36,938 [WARNING] Invalid secret from testclient
+2026-04-09 20:52:33,639 [INFO] Sent message to 1: None
+2026-04-09 20:52:33,646 [INFO] Received MAX update: message_created
+2026-04-09 20:52:33,647 [INFO] Sent message to 123: None
+2026-04-09 20:52:33,648 [INFO] Received MAX update: message_callback
+2026-04-09 20:52:33,827 [WARNING] Invalid secret from testclient
+2026-04-09 21:12:23,948 [INFO] Sent message to 1: None
+2026-04-09 21:12:23,954 [INFO] Received MAX update: message_created
+2026-04-09 21:12:23,955 [INFO] Sent message to 123: None
+2026-04-09 21:12:23,957 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:23,957 [INFO] MAX Callback: user=123, mid=m1, data=week:0
+2026-04-09 21:12:24,133 [WARNING] Invalid secret from testclient
+2026-04-09 21:12:40,754 [INFO] Sent message to 1: None
+2026-04-09 21:12:40,761 [INFO] Received MAX update: message_created
+2026-04-09 21:12:40,762 [INFO] Sent message to 123: None
+2026-04-09 21:12:40,764 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:40,764 [INFO] MAX Callback: user=123, mid=m1, data=week:0
+2026-04-09 21:12:40,764 [INFO] Edited message None
+2026-04-09 21:12:40,766 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:40,766 [INFO] MAX Callback: user=123, mid=m1, data=date:2024-04-09
+2026-04-09 21:12:40,767 [INFO] Edited message None
+2026-04-09 21:12:40,768 [INFO] Edited message None
+2026-04-09 21:12:40,770 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:40,770 [INFO] MAX Callback: user=123, mid=m1, data=toggle:pair_0
+2026-04-09 21:12:40,770 [INFO] Edited message None
+2026-04-09 21:12:40,772 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:40,772 [INFO] MAX Callback: user=123, mid=m1, data=toggle_all
+2026-04-09 21:12:40,772 [INFO] Edited message None
+2026-04-09 21:12:40,774 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:40,774 [INFO] MAX Callback: user=123, mid=m1, data=generate_pdf
+2026-04-09 21:12:40,774 [INFO] Edited message None
+2026-04-09 21:12:40,774 [ERROR] MAX PDF error
+Traceback (most recent call last):
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 323, in max_webhook
+    token = await max_client.upload_file(pdf_bytes, f"Troparia_{date_str}.pdf")
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 117, in upload_file
+    upload_url = resp.json()["url"]
+KeyError: 'url'
+2026-04-09 21:12:40,775 [INFO] Edited message None
+2026-04-09 21:12:40,777 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:40,777 [INFO] MAX Callback: user=123, mid=m1, data=back_to_calendar
+2026-04-09 21:12:40,777 [INFO] Edited message None
+2026-04-09 21:12:40,783 [WARNING] Invalid secret from testclient
+2026-04-09 21:12:43,527 [INFO] Sent message to 1: None
+2026-04-09 21:12:43,535 [INFO] Received MAX update: message_created
+2026-04-09 21:12:43,536 [INFO] Sent message to 123: None
+2026-04-09 21:12:43,537 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:43,538 [INFO] MAX Callback: user=123, mid=m1, data=week:0
+2026-04-09 21:12:43,538 [INFO] Edited message None
+2026-04-09 21:12:43,540 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:43,540 [INFO] MAX Callback: user=123, mid=m1, data=date:2024-04-09
+2026-04-09 21:12:43,540 [INFO] Edited message None
+2026-04-09 21:12:43,540 [INFO] Edited message None
+2026-04-09 21:12:43,542 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:43,542 [INFO] MAX Callback: user=123, mid=m1, data=toggle:pair_0
+2026-04-09 21:12:43,542 [INFO] Edited message None
+2026-04-09 21:12:43,544 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:43,544 [INFO] MAX Callback: user=123, mid=m1, data=toggle_all
+2026-04-09 21:12:43,545 [INFO] Edited message None
+2026-04-09 21:12:43,546 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:43,547 [INFO] MAX Callback: user=123, mid=m1, data=generate_pdf
+2026-04-09 21:12:43,547 [INFO] Edited message None
+2026-04-09 21:12:43,547 [ERROR] MAX PDF error
+Traceback (most recent call last):
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 323, in max_webhook
+    token = await max_client.upload_file(pdf_bytes, f"Troparia_{date_str}.pdf")
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 117, in upload_file
+    upload_url = resp.json()["url"]
+KeyError: 'url'
+2026-04-09 21:12:43,549 [INFO] Edited message None
+2026-04-09 21:12:43,550 [INFO] Received MAX update: message_callback
+2026-04-09 21:12:43,551 [INFO] MAX Callback: user=123, mid=m1, data=back_to_calendar
+2026-04-09 21:12:43,551 [INFO] Edited message None
+2026-04-09 21:12:43,557 [WARNING] Invalid secret from testclient
+2026-04-09 22:39:51,541 [INFO] Sent message to 1: None
+2026-04-09 22:39:51,548 [INFO] Received MAX update: message_created
+2026-04-09 22:39:51,549 [INFO] Sent message to 123: None
+2026-04-09 22:39:51,551 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:51,551 [INFO] MAX Callback: user=123, mid=m1, data=week:0
+2026-04-09 22:39:51,551 [INFO] Edited message m1
+2026-04-09 22:39:51,552 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:51,552 [INFO] MAX Callback: user=123, mid=m1, data=date:2024-04-09
+2026-04-09 22:39:51,553 [INFO] Edited message m1
+2026-04-09 22:39:51,554 [INFO] Edited message m1
+2026-04-09 22:39:51,556 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:51,556 [INFO] MAX Callback: user=123, mid=m1, data=toggle:pair_0
+2026-04-09 22:39:51,556 [INFO] Edited message m1
+2026-04-09 22:39:51,557 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:51,557 [INFO] MAX Callback: user=123, mid=m1, data=toggle_all
+2026-04-09 22:39:51,557 [INFO] Edited message m1
+2026-04-09 22:39:51,559 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:51,559 [INFO] MAX Callback: user=123, mid=m1, data=generate_pdf
+2026-04-09 22:39:51,559 [INFO] Edited message m1
+2026-04-09 22:39:51,559 [ERROR] MAX PDF error
+Traceback (most recent call last):
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 318, in max_webhook
+    token = await max_client.upload_file(pdf_bytes, f"Troparia_{date_str}.pdf")
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 117, in upload_file
+    upload_url = resp.json()["url"]
+KeyError: 'url'
+2026-04-09 22:39:51,560 [INFO] Edited message m1
+2026-04-09 22:39:51,561 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:51,561 [INFO] MAX Callback: user=123, mid=m1, data=back_to_calendar
+2026-04-09 22:39:51,562 [INFO] Edited message m1
+2026-04-09 22:39:51,567 [WARNING] Invalid secret from testclient
+2026-04-09 22:39:54,452 [INFO] Sent message to 1: None
+2026-04-09 22:39:54,460 [INFO] Received MAX update: message_created
+2026-04-09 22:39:54,461 [INFO] Sent message to 123: None
+2026-04-09 22:39:54,463 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:54,463 [INFO] MAX Callback: user=123, mid=m1, data=week:0
+2026-04-09 22:39:54,463 [INFO] Edited message m1
+2026-04-09 22:39:54,465 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:54,466 [INFO] MAX Callback: user=123, mid=m1, data=date:2024-04-09
+2026-04-09 22:39:54,466 [INFO] Edited message m1
+2026-04-09 22:39:54,466 [INFO] Edited message m1
+2026-04-09 22:39:54,468 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:54,468 [INFO] MAX Callback: user=123, mid=m1, data=toggle:pair_0
+2026-04-09 22:39:54,468 [INFO] Edited message m1
+2026-04-09 22:39:54,470 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:54,470 [INFO] MAX Callback: user=123, mid=m1, data=toggle_all
+2026-04-09 22:39:54,470 [INFO] Edited message m1
+2026-04-09 22:39:54,472 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:54,472 [INFO] MAX Callback: user=123, mid=m1, data=generate_pdf
+2026-04-09 22:39:54,472 [INFO] Edited message m1
+2026-04-09 22:39:54,473 [ERROR] MAX PDF error
+Traceback (most recent call last):
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 318, in max_webhook
+    token = await max_client.upload_file(pdf_bytes, f"Troparia_{date_str}.pdf")
+  File "/Users/dima/Sites/troparia-bot/max_bot.py", line 117, in upload_file
+    upload_url = resp.json()["url"]
+KeyError: 'url'
+2026-04-09 22:39:54,475 [INFO] Edited message m1
+2026-04-09 22:39:54,476 [INFO] Received MAX update: message_callback
+2026-04-09 22:39:54,476 [INFO] MAX Callback: user=123, mid=m1, data=back_to_calendar
+2026-04-09 22:39:54,477 [INFO] Edited message m1
+2026-04-09 22:39:54,483 [WARNING] Invalid secret from testclient

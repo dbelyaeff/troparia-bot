@@ -1,0 +1,27 @@
+2026-04-09 15:27:35,372 [ERROR] Ошибка генерации PDF
+Traceback (most recent call last):
+  File "/Users/dima/Sites/troparia-bot/bot.py", line 215, in common_generate_pdf
+    pdf_bytes = generate_pdf_bytes(date_str, FONT_PATH, sections=get_pdf_sections(selected_pairs))
+  File "/Users/dima/Sites/troparia-bot/shared_logic.py", line 167, in get_pdf_sections
+    sections.append({"section": pair["section"], "items": items})
+KeyError: 'section'
+2026-04-09 15:27:35,382 [INFO] Starting in WEBHOOK mode. URL: https://x/w
+2026-04-09 15:27:35,382 [INFO] Starting in POLLING mode
+2026-04-09 21:12:43,115 [ERROR] Ошибка генерации PDF
+Traceback (most recent call last):
+  File "/Users/dima/Sites/troparia-bot/bot.py", line 215, in common_generate_pdf
+    pdf_bytes = generate_pdf_bytes(date_str, FONT_PATH, sections=get_pdf_sections(selected_pairs))
+  File "/Users/dima/Sites/troparia-bot/shared_logic.py", line 167, in get_pdf_sections
+    sections.append({"section": pair["section"], "items": items})
+KeyError: 'section'
+2026-04-09 21:12:43,127 [INFO] Starting in WEBHOOK mode. URL: https://x/w
+2026-04-09 21:12:43,128 [INFO] Starting in POLLING mode
+2026-04-09 22:39:54,034 [ERROR] Ошибка генерации PDF
+Traceback (most recent call last):
+  File "/Users/dima/Sites/troparia-bot/bot.py", line 215, in common_generate_pdf
+    pdf_bytes = generate_pdf_bytes(date_str, FONT_PATH, sections=get_pdf_sections(selected_pairs))
+  File "/Users/dima/Sites/troparia-bot/shared_logic.py", line 167, in get_pdf_sections
+    sections.append({"section": pair["section"], "items": items})
+KeyError: 'section'
+2026-04-09 22:39:54,046 [INFO] Starting in WEBHOOK mode. URL: https://x/w
+2026-04-09 22:39:54,046 [INFO] Starting in POLLING mode

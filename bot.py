@@ -47,55 +47,43 @@ FONT_PATH = os.environ.get("FONT_PATH", "/app/fonts/PonomarUnicode.otf")
 
 # ─── Клавиатуры ───
 
-def build_date_keyboard(week_offset: int = 0) -> InlineKeyboardMarkup:
+def build_date_keyboard(week_offset: int = 0) -> ReplyKeyboardMarkup:
     liturgical_today = get_liturgical_date().date()
     start = liturgical_today + timedelta(weeks=week_offset)
     buttons = []
     
-    if week_offset == 0:
-        d = start
-        weekday_full = "Воскресенье" if d.weekday() == 6 else DAYS_RU[d.weekday()]
-        label = f"📅 Сегодня {d.day} {MONTHS_RU[d.month]} ({weekday_full})"
-        buttons.append([InlineKeyboardButton(label, callback_data=f"date:{d.isoformat()}")])
+    # Generate 7 days
+    for i in range(7):
+        d = start + timedelta(days=i)
+        weekday = DAYS_RU[d.weekday()]
+        label = f"{d.day} {MONTHS_RU[d.month]} ({weekday})"
+        if d == liturgical_today:
+            label = f"📅 {label}"
+        elif d.weekday() == 6:
+            label = f"{label} ✝️"
         
-        row = []
-        for i in range(1, 7):
-            d = start + timedelta(days=i)
-            weekday = DAYS_RU[d.weekday()]
-            if d.weekday() == 6:
-                if row: buttons.append(row)
-                row = []
-                label = f"{d.day} {MONTHS_RU[d.month]} ({weekday}) ✝️"
-                buttons.append([InlineKeyboardButton(label, callback_data=f"date:{d.isoformat()}")])
-            else:
-                label = f"{d.day} {MONTHS_RU[d.month]} ({weekday})"
-                row.append(InlineKeyboardButton(label, callback_data=f"date:{d.isoformat()}"))
-                if len(row) == 2:
-                    buttons.append(row); row = []
-        if row: buttons.append(row)
-    else:
-        row = []
-        for i in range(7):
-            d = start + timedelta(days=i)
-            weekday = DAYS_RU[d.weekday()]
-            if d.weekday() == 6:
-                if row: buttons.append(row)
-                row = []
-                label = f"{d.day} {MONTHS_RU[d.month]} ({weekday}) ✝️"
-                buttons.append([InlineKeyboardButton(label, callback_data=f"date:{d.isoformat()}")])
-            else:
-                label = f"{d.day} {MONTHS_RU[d.month]} ({weekday})"
-                row.append(InlineKeyboardButton(label, callback_data=f"date:{d.isoformat()}"))
-                if len(row) == 2:
-                    buttons.append(row); row = []
-        if row: buttons.append(row)
+        # Add to button list
+        buttons.append(KeyboardButton(label))
 
+    # Layout: 1 today/special, then 2 per row, then nav
+    keyboard = []
+    if week_offset == 0:
+        keyboard.append([buttons[0]]) # Today
+        keyboard.append(buttons[1:3])
+        keyboard.append(buttons[3:5])
+        keyboard.append(buttons[5:7])
+    else:
+        keyboard.append(buttons[0:2])
+        keyboard.append(buttons[2:4])
+        keyboard.append(buttons[4:6])
+        keyboard.append([buttons[6]])
+        
     nav = []
-    if week_offset > 0:
-        nav.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"week:{week_offset - 1}"))
-    nav.append(InlineKeyboardButton("Вперёд ▶️", callback_data=f"week:{week_offset + 1}"))
-    buttons.append(nav)
-    return InlineKeyboardMarkup(buttons)
+    nav.append(KeyboardButton("⬅️ Предыдущая неделя"))
+    nav.append(KeyboardButton("Следующая неделя ▶️"))
+    keyboard.append(nav)
+    
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 def build_selection_keyboard(pairs: list, selections: dict) -> InlineKeyboardMarkup:
     buttons = []
@@ -231,10 +219,71 @@ async def reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "📄 Сгенерировать PDF":
         await common_generate_pdf(update, user_id, user_state)
+        return
     elif text == "⬅️ Назад":
         await state_manager.clear_state(user_id)
         await update.message.reply_text("📅 <b>Выберите дату:</b>", parse_mode="HTML", reply_markup=build_date_keyboard(0))
-        await update.message.reply_text(".", reply_markup=ReplyKeyboardRemove())
+        return
+    elif text == "⬅️ Предыдущая неделя":
+        offset = user_state.get("week_offset", 0) - 1
+        user_state["week_offset"] = offset
+        await state_manager.set_state(user_id, user_state)
+        await update.message.reply_text("📅 <b>Выберите дату:</b>", parse_mode="HTML", reply_markup=build_date_keyboard(offset))
+        return
+    elif text == "Следующая неделя ▶️":
+        offset = user_state.get("week_offset", 0) + 1
+        user_state["week_offset"] = offset
+        await state_manager.set_state(user_id, user_state)
+        await update.message.reply_text("📅 <b>Выберите дату:</b>", parse_mode="HTML", reply_markup=build_date_keyboard(offset))
+        return
+
+    # Check if text is a date label
+    clean_text = text.replace("📅 ", "").replace(" ✝️", "").strip()
+    liturgical_today = get_liturgical_date().date()
+    target_date = None
+    
+    # Search in a window
+    for i in range(-30, 31):
+        d = liturgical_today + timedelta(days=i)
+        label = f"{d.day} {MONTHS_RU[d.month]} ({DAYS_RU[d.weekday()]})"
+        if label == clean_text:
+            target_date = d.isoformat()
+            break
+            
+    if target_date:
+        await process_date_selection_text(update, user_id, target_date, user_state)
+    else:
+        # Default start behavior if unrecognized and no state
+        if not user_state:
+            await cmd_start(update, context)
+
+async def process_date_selection_text(update: Update, user_id: str, date_str: str, user_state: dict):
+    date_human = get_date_human(date_str)
+    await update.message.reply_text(f"⏳ Загружаю данные на <b>{date_human}</b>...", parse_mode="HTML")
+    
+    try:
+        ukazaniya_text, pairs = await fetch_data_for_date(date_str)
+        user_state.update({
+            "selected_date": date_str,
+            "pairs": pairs,
+            "selections": {f"pair_{i}": True for i in range(len(pairs))}
+        })
+        await state_manager.set_state(user_id, user_state)
+        
+        await update.message.reply_text(
+            f"📖 <b>Богослужебные указания</b> на <b>{date_human}</b>\n\n"
+            f"<i>Что читается на Часах:</i>\n\n{ukazaniya_text}",
+            parse_mode="HTML"
+        )
+        await update.message.reply_text(
+            "🔹 <b>Выберите тропари и кондаки</b>",
+            parse_mode="HTML",
+            reply_markup=build_selection_keyboard(pairs, user_state["selections"])
+        )
+        await update.message.reply_text("Выбирайте тропари и кондаки 👆", reply_markup=build_selection_reply_keyboard())
+    except Exception as e:
+        logger.exception("Ошибка загрузки данных")
+        await update.message.reply_text(f"❌ Ошибка: {e}", reply_markup=build_date_keyboard(0))
 
 def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN")

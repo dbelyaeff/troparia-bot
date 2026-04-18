@@ -37,7 +37,7 @@ LINE_SPACING_K = 1.5
 GAP_SECTION = 8
 GAP_ITEM = 4
 
-FONT_MIN, FONT_MAX, FONT_STEP = 10.0, 20.0, 0.1
+FONT_MIN, FONT_MAX, FONT_STEP = 10.0, 25.0, 0.1
 MAX_PAGES = 4
 
 COLOR_RED = (0.933, 0.133, 0.047)
@@ -445,11 +445,11 @@ def _find_optimal_font(sections, max_pages=MAX_PAGES):
     # Считаем общее количество элементов
     total_items = sum(len(sec.get("items", [])) for sec in sections)
     
-    # Целевое количество страниц: минимум 2, но не больше max_pages
-    # Примерно 1-2 пары на страницу
-    target_pages = max(2, min(max_pages, total_items // 2))
-    if target_pages < 2 and total_items > 0:
-        target_pages = 2
+    # Целевое количество страниц: минимум 1-2, но не больше max_pages
+    # Примерно 1-2 пары на страницу. Если элементов мало, не форсируем 2-ю страницу.
+    target_pages = max(1, min(max_pages, total_items // 2))
+    if target_pages < 1 and total_items > 0:
+        target_pages = 1
     
     # Начинаем с максимального шрифта и уменьшаем, пока не заполним нужное количество страниц
     fs = FONT_MAX

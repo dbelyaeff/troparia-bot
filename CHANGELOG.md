@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-04-18
+
+### Changed
+- **Adaptive PDF Font Size**: Optimized `FONT_MAX` (25pt) to fill the page elegantly for single items without word-wrap breakage.
+- **Improved UX/Navigation**: Switched to text-sending buttons in both Telegram (`ReplyKeyboard`) and MAX (`MessageButton`) to provide immediate feedback by making user selections visible in chat.
+- **Robust Date Parsing**: Implemented regex-based date parsing from text messages for seamless transition to text-based navigation.
+
 ## [1.2.0] - 2026-04-15
 
 ### Changed
