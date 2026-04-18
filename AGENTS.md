@@ -12,6 +12,7 @@ Welcome to the Troparia Bot project! To maintain consistency and reliable deploy
 - **Method**: Git-based.
     1. Commit and push changes to GitHub.
     2. Run `make deploy` to trigger remote pull and container rebuild.
+- **Mandatory Deployment**: After completing ANY functional or configuration changes, you MUST perform a deployment to ensure the production environment stays in sync with the repository.
 - **Environment Variables**: Never hardcode secrets. Use `.env` (not tracked in Git) and ensure new variables are added to the server's `.env` manually or via instructions.
 
 ## 3. Technology Stack
