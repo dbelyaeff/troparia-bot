@@ -576,11 +576,20 @@ class _TwoUpRenderer:
 
     def render_block(self, block):
         """Рендерит блок по частям, текст идёт непрерывным потоком."""
-        for part in block["parts"]:
+        for i, part in enumerate(block["parts"]):
             if part["kind"] == "heading":
                 part_h = _heading_h(part["text"], self.fs)
-                # Ensure heading + small buffer (e.g. 2 lines of next item)
-                self._ensure(part_h + 2 * self.lh)
+                
+                # Пытаемся захватить начало следующего элемента, чтобы не оставлять заголовок один на странице
+                ensure_h = part_h + 2 * self.lh
+                if i + 1 < len(block["parts"]):
+                    next_part = block["parts"][i+1]
+                    if next_part["kind"] == "item":
+                        # Заголовок + метка следующего элемента + минимум 2 строки его текста
+                        keep_lines = min(next_part.get("text_lines", 0), 2)
+                        ensure_h = part_h + self.lh + keep_lines * self.lh + GAP_ITEM
+                
+                self._ensure(ensure_h)
                 
                 z = self.z
                 self.c.setFont(FONT_NAME, self.fs)
