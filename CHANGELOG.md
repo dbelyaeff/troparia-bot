@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-04-19
+
+### Fixed
+- **Liturgical Text Parsing**: Significantly improved "Bogosluzhebnye Ukazaniya" parsing to capture "праздника", "святого", and other common terms.
+- **Fuzzy Section Mapping**: Implemented fuzzy matching for section names in the full instructions text, ensuring saints and feasts mentioned anywhere on the page are included.
+- **Section Name Preservation**: The bot now preserves original section names (e.g., "Недели жен-мироносиц") instead of using generic labels (e.g., "Тропарь (Триоди)").
+- **"Ин тропарь" Support**: Fixed case-sensitivity issue in item type normalization, ensuring "Another troparion" texts are correctly identified and included.
+
 ## [1.2.1] - 2026-04-18
 
 ### Changed

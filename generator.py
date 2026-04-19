@@ -197,9 +197,10 @@ def _parse_troparia(html: str) -> list[dict]:
                     if match:
                         item_type_full = match.group(1)
                         # Нормализуем тип
-                        if "Ин Тропарь" in item_type_full:
+                        it_low = item_type_full.lower()
+                        if "ин тропарь" in it_low:
                             item_type = "Тропарь"
-                        elif "Ин Кондак" in item_type_full:
+                        elif "ин кондак" in it_low:
                             item_type = "Кондак"
                         else:
                             item_type = item_type_full

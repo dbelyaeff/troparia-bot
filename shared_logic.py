@@ -50,90 +50,123 @@ async def fetch_data_for_date(date_str: str) -> Tuple[str, List[Dict]]:
     all_refs = {"tropars": set(), "kontaks": set()}
     
     for info in hours_info:
-        raw_text = info.get("raw_text", "")
+        raw_text = info.get("raw_text", "").lower()
         # Извлекаем ссылки на тропари/кондаки из текста
-        if "тропарь воскресный" in raw_text.lower():
+        if "тропарь воскресный" in raw_text:
             all_refs["tropars"].add(("воскресный", None))
-        if "тропарь триоди" in raw_text.lower() or "тропарь креста" in raw_text.lower():
-            all_refs["tropars"].add(("триодь", None))
-        if "тропарь богородиц" in raw_text.lower() or "иконы" in raw_text.lower():
+        if any(kw in raw_text for kw in ["тропарь триоди", "тропарь цветной", "тропарь праздника", "тропарь пасхи"]):
+            all_refs["tropars"].add(("праздник", None))
+        if any(kw in raw_text for kw in ["тропарь свято", "тропарь преподобн", "тропарь мученик", "тропарь святител", "тропарь блж", "тропарь прав"]):
+            all_refs["tropars"].add(("святой", None))
+        if "тропарь богородиц" in raw_text or "иконы" in raw_text:
             all_refs["tropars"].add(("богородица", None))
-        if "григор" in raw_text.lower():
-            glas_match = re.search(r'глас\s*(\d+)[-:]?', raw_text.lower())
+        if "григор" in raw_text:
+            glas_match = re.search(r'глас\s*(\d+)[-:]?', raw_text)
             glas = glas_match.group(1) if glas_match else None
             all_refs["tropars"].add(("григорий", glas))
             
-        if "кондак воскресный" in raw_text.lower():
+        if "кондак воскресный" in raw_text:
             all_refs["kontaks"].add(("воскресный", None))
-        if "кондак триоди" in raw_text.lower() or "кондак креста" in raw_text.lower():
-            all_refs["kontaks"].add(("триодь", None))
-        if "кондак богородиц" in raw_text.lower():
+        if any(kw in raw_text for kw in ["кондак триоди", "кондак цветной", "кондак праздника", "кондак пасхи"]):
+            all_refs["kontaks"].add(("праздник", None))
+        if any(kw in raw_text for kw in ["кондак свято", "кондак преподобн", "кондак мученик", "кондак святител", "кондак блж", "кондак прав"]):
+            all_refs["kontaks"].add(("святой", None))
+        if "кондак богородиц" in raw_text:
             all_refs["kontaks"].add(("богородица", None))
-        if "григор" in raw_text.lower() and "кондак" in raw_text.lower():
-            glas_match = re.search(r'кондак.*?глас\s*(\d+)[-:]?', raw_text.lower())
+        if "григор" in raw_text and "кондак" in raw_text:
+            glas_match = re.search(r'кондак.*?глас\s*(\d+)[-:]?', raw_text)
             glas = glas_match.group(1) if glas_match else None
             all_refs["kontaks"].add(("григорий", glas))
 
-    # Сбор пар
+    # Сбор тропарей
     for ref, glas in all_refs["tropars"]:
-        tropar_text = None
-        tropar_glas = ""
         for sec in all_troparia:
             sec_name = sec.get("section", "")
             match = False
-            if ref == "воскресный" and "воскресн" in sec_name.lower(): match = True
-            elif ref == "триодь" and ("триод" in sec_name.lower() or "пост" in sec_name.lower() or "крест" in sec_name.lower()): match = True
-            elif ref == "богородица" and ("богородиц" in sec_name.lower() or "икон" in sec_name.lower()): match = True
-            elif ref == "григорий" and "григор" in sec_name.lower(): match = True
+            s_low = sec_name.lower()
+            if ref == "воскресный" and "воскресн" in s_low: match = True
+            elif ref == "праздник" and any(kw in s_low for kw in ["триод", "цвето", "недел", "пасх", "праздник", "успени", "рождеств", "покров"]): match = True
+            elif ref == "святой" and not any(kw in s_low for kw in ["воскресн", "пасх", "триод", "богородиц", "икон"]): match = True
+            elif ref == "богородица" and ("богородиц" in s_low or "икон" in s_low): match = True
+            elif ref == "григорий" and "григор" in s_low: match = True
             
             if match:
                 for item in sec.get("items", []):
-                    if item["type"] == "Тропарь" and not tropar_text:
+                    if item["type"] == "Тропарь":
                         if glas is None or item["glas"] == glas:
-                            tropar_text, tropar_glas = item["text"], item["glas"]
-                            break
-        
-        if tropar_text:
-            key = (tropar_text[:50], tropar_glas)
-            if key not in seen_tropars:
-                seen_tropars.add(key)
-                pairs.append({
-                    "section": f"Тропарь ({ref.capitalize() if ref != 'триодь' else 'Триоди'})",
-                    "tropar": {"text": tropar_text, "glas": tropar_glas},
-                    "kontak": None,
-                    "tropar_glas": tropar_glas,
-                    "kontak_glas": "",
-                })
+                            t_text, t_glas = item["text"], item["glas"]
+                            key = (t_text[:50], t_glas)
+                            if key not in seen_tropars:
+                                seen_tropars.add(key)
+                                pairs.append({
+                                    "section": sec_name,
+                                    "tropar": {"text": t_text, "glas": t_glas},
+                                    "kontak": None,
+                                    "tropar_glas": t_glas,
+                                    "kontak_glas": "",
+                                })
 
+    # Дополнительный поиск: ищем упоминания всех разделов в полном тексте указаний
+    # Это поможет найти святых, которые не попали в краткий список "на часах"
+    uk_low = ukazaniya_html.lower()
+    for sec in all_troparia:
+        sec_name = sec.get("section", "")
+        if "воскресн" in sec_name.lower(): continue # Уже обработано
+        
+        # Извлекаем значимые слова (дольше 3 символов)
+        words = re.findall(r'[а-яА-ЯёЁ]{4,}', sec_name)
+        if not words: continue
+        
+        found = False
+        # Проверяем первые два значимых слова (обычно имя или название праздника)
+        for w in words[:2]:
+            # Отрезаем окончание для более гибкого поиска (оставляем корень)
+            root = w[:-2] if len(w) > 5 else w[:-1]
+            if root.lower() in uk_low:
+                found = True
+                break
+        
+        if found:
+            for item in sec.get("items", []):
+                seen_set = seen_tropars if item["type"] == "Тропарь" else seen_kontaks
+                key = (item["text"][:50], item["glas"])
+                if key not in seen_set:
+                    seen_set.add(key)
+                    pairs.append({
+                        "section": sec_name,
+                        "tropar": item if item["type"] == "Тропарь" else None,
+                        "kontak": item if item["type"] == "Кондак" else None,
+                        "tropar_glas": item["glas"] if item["type"] == "Тропарь" else "",
+                        "kontak_glas": item["glas"] if item["type"] == "Кондак" else "",
+                    })
+
+    # Сбор кондаков
     for ref, glas in all_refs["kontaks"]:
-        kontak_text = None
-        kontak_glas = ""
         for sec in all_troparia:
             sec_name = sec.get("section", "")
             match = False
-            if ref == "воскресный" and "воскресн" in sec_name.lower(): match = True
-            elif ref == "триодь" and ("триод" in sec_name.lower() or "пост" in sec_name.lower() or "крест" in sec_name.lower()): match = True
-            elif ref == "богородица" and ("богородиц" in sec_name.lower() or "икон" in sec_name.lower()): match = True
-            elif ref == "григорий" and "григор" in sec_name.lower(): match = True
+            s_low = sec_name.lower()
+            if ref == "воскресный" and "воскресн" in s_low: match = True
+            elif ref == "праздник" and any(kw in s_low for kw in ["триод", "цвето", "недел", "пасх", "праздник", "успени", "рождеств", "покров"]): match = True
+            elif ref == "святой" and not any(kw in s_low for kw in ["воскресн", "пасх", "триод", "богородиц", "икон"]): match = True
+            elif ref == "богородица" and ("богородиц" in s_low or "икон" in s_low): match = True
+            elif ref == "григорий" and "григор" in s_low: match = True
             
             if match:
                 for item in sec.get("items", []):
-                    if item["type"] == "Кондак" and not kontak_text:
+                    if item["type"] == "Кондак":
                         if glas is None or item["glas"] == glas:
-                            kontak_text, kontak_glas = item["text"], item["glas"]
-                            break
-        
-        if kontak_text:
-            key = (kontak_text[:50], kontak_glas)
-            if key not in seen_kontaks:
-                seen_kontaks.add(key)
-                pairs.append({
-                    "section": f"Кондак ({ref.capitalize() if ref != 'триодь' else 'Триоди'}, глас {kontak_glas})",
-                    "tropar": None,
-                    "kontak": {"text": kontak_text, "glas": kontak_glas},
-                    "tropar_glas": "",
-                    "kontak_glas": kontak_glas,
-                })
+                            k_text, k_glas = item["text"], item["glas"]
+                            key = (k_text[:50], k_glas)
+                            if key not in seen_kontaks:
+                                seen_kontaks.add(key)
+                                pairs.append({
+                                    "section": sec_name,
+                                    "tropar": None,
+                                    "kontak": {"text": k_text, "glas": k_glas},
+                                    "tropar_glas": "",
+                                    "kontak_glas": k_glas,
+                                })
 
     if not pairs:
         for sec in all_troparia:
@@ -141,15 +174,27 @@ async def fetch_data_for_date(date_str: str) -> Tuple[str, List[Dict]]:
             items = sec.get("items", [])
             troparia = [i for i in items if i["type"] == "Тропарь"]
             kontakia = [i for i in items if i["type"] == "Кондак"]
-            for t_idx, tropar in enumerate(troparia):
-                kontak = kontakia[t_idx] if t_idx < len(kontakia) else None
-                pairs.append({
-                    "section": section_name,
-                    "tropar": tropar,
-                    "kontak": kontak,
-                    "tropar_glas": tropar["glas"],
-                    "kontak_glas": kontak["glas"] if kontak else "-",
-                })
+            # Пытаемся объединить в пары, если их одинаковое количество
+            if len(troparia) == len(kontakia) and len(troparia) > 0:
+                for t, k in zip(troparia, kontakia):
+                    pairs.append({
+                        "section": section_name,
+                        "tropar": t,
+                        "kontak": k,
+                        "tropar_glas": t["glas"],
+                        "kontak_glas": k["glas"],
+                    })
+            else:
+                for t in troparia:
+                    pairs.append({
+                        "section": section_name, "tropar": t, "kontak": None,
+                        "tropar_glas": t["glas"], "kontak_glas": "",
+                    })
+                for k in kontakia:
+                    pairs.append({
+                        "section": section_name, "tropar": None, "kontak": k,
+                        "tropar_glas": "", "kontak_glas": k["glas"],
+                    })
 
     ukazaniya_text = "\n\n".join([info.get("raw_text", "") for info in hours_info]) if hours_info else "Все тропари и кондаки дня"
     return ukazaniya_text, pairs
