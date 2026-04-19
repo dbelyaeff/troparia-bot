@@ -225,7 +225,12 @@ def _parse_troparia(html: str) -> list[dict]:
                                         text = p_elem.get_text(strip=True)
                                     
                                     if text and not text.startswith("Перевод:"):
-                                        items.append({"type": item_type, "glas": glas, "text": text})
+                                        items.append({
+                                            "type": item_type,
+                                            "display_type": it_low.capitalize(), # Keep capitalization consistent
+                                            "glas": glas,
+                                            "text": text
+                                        })
             
             current = current.next_sibling
         

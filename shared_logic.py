@@ -100,6 +100,7 @@ async def fetch_data_for_date(date_str: str) -> Tuple[str, List[Dict]]:
                                 seen_tropars.add(key)
                                 pairs.append({
                                     "section": sec_name,
+                                    "type": item.get("display_type", "Тропарь"),
                                     "tropar": {"text": t_text, "glas": t_glas},
                                     "kontak": None,
                                     "tropar_glas": t_glas,
@@ -134,6 +135,7 @@ async def fetch_data_for_date(date_str: str) -> Tuple[str, List[Dict]]:
                     seen_set.add(key)
                     pairs.append({
                         "section": sec_name,
+                        "type": item.get("display_type", item["type"]),
                         "tropar": item if item["type"] == "Тропарь" else None,
                         "kontak": item if item["type"] == "Кондак" else None,
                         "tropar_glas": item["glas"] if item["type"] == "Тропарь" else "",
@@ -162,6 +164,7 @@ async def fetch_data_for_date(date_str: str) -> Tuple[str, List[Dict]]:
                                 seen_kontaks.add(key)
                                 pairs.append({
                                     "section": sec_name,
+                                    "type": item.get("display_type", "Кондак"),
                                     "tropar": None,
                                     "kontak": {"text": k_text, "glas": k_glas},
                                     "tropar_glas": "",
@@ -179,6 +182,7 @@ async def fetch_data_for_date(date_str: str) -> Tuple[str, List[Dict]]:
                 for t, k in zip(troparia, kontakia):
                     pairs.append({
                         "section": section_name,
+                        "type": "Тропарь и кондак",
                         "tropar": t,
                         "kontak": k,
                         "tropar_glas": t["glas"],
@@ -187,12 +191,16 @@ async def fetch_data_for_date(date_str: str) -> Tuple[str, List[Dict]]:
             else:
                 for t in troparia:
                     pairs.append({
-                        "section": section_name, "tropar": t, "kontak": None,
+                        "section": section_name,
+                        "type": t.get("display_type", "Тропарь"),
+                        "tropar": t, "kontak": None,
                         "tropar_glas": t["glas"], "kontak_glas": "",
                     })
                 for k in kontakia:
                     pairs.append({
-                        "section": section_name, "tropar": None, "kontak": k,
+                        "section": section_name,
+                        "type": k.get("display_type", "Кондак"),
+                        "tropar": None, "kontak": k,
                         "tropar_glas": "", "kontak_glas": k["glas"],
                     })
 
@@ -205,9 +213,15 @@ def get_pdf_sections(selected_pairs: List[Dict]) -> List[Dict]:
     for pair in selected_pairs:
         items = []
         if pair.get("tropar"):
-            items.append({"type": "Тропарь", "glas": pair["tropar_glas"], "text": pair["tropar"]["text"]})
+            p_type = pair.get("type", "Тропарь")
+            if "кондак" in p_type.lower() and pair.get("kontak") is None: # safety check
+                p_type = "Тропарь"
+            items.append({"type": p_type, "glas": pair["tropar_glas"], "text": pair["tropar"]["text"]})
         if pair.get("kontak"):
-            items.append({"type": "Кондак", "glas": pair["kontak_glas"], "text": pair["kontak"]["text"]})
+            p_type = pair.get("type", "Кондак")
+            if "тропарь" in p_type.lower() and pair.get("tropar") is None: # safety check
+                 p_type = "Кондак"
+            items.append({"type": p_type, "glas": pair["kontak_glas"], "text": pair["kontak"]["text"]})
         if items:
             sections.append({"section": pair["section"], "items": items})
     return sections

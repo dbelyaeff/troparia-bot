@@ -156,7 +156,7 @@ def build_max_selection_keyboard(pairs: list, selections: dict, date_str: str = 
         is_selected = selections.get(pair_id, True)
         icon = "✅" if is_selected else "⬜"
         builder.row(CallbackButton(
-            text=f"{icon} {pair.get('section', '')}", 
+            text=f"{icon} {pair.get('type', 'Тропарь')}: {pair.get('section', '')}", 
             payload=f"toggle:{pair_id}:{date_str}"
         ))
 

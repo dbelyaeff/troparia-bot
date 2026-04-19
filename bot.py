@@ -91,7 +91,8 @@ def build_selection_keyboard(pairs: list, selections: dict) -> InlineKeyboardMar
         pair_id = f"pair_{pair_idx}"
         is_selected = selections.get(pair_id, True)
         check = "✅" if is_selected else "❌"
-        label = f"{check} {pair.get('section', '')} (гл.{pair.get('tropar_glas', '')}/{pair.get('kontak_glas', '')})"
+        glas = pair.get('tropar_glas') or pair.get('kontak_glas') or "?"
+        label = f"{check} {pair.get('type', 'Тропарь')}: {pair.get('section', '')} (гл. {glas})"
         buttons.append([InlineKeyboardButton(label, callback_data=f"toggle:{pair_id}")])
     
     if pairs:
