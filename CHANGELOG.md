@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2026-04-22
+
+### Added
+- **Friendly Welcome Experience**: Implemented a descriptive welcome message with emojis for the `/start` command that explains the bot's features (Calendar, PDF generation, Troparia selection).
+- **Catch-all Unknown Message Handler**: Both Telegram and MAX bots now respond to unrecognized text or media with the welcome message and a fresh calendar, improving discoverability and helping stuck users.
+
 ## [1.2.4] - 2026-04-19
 
 ### Fixed

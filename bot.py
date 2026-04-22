@@ -107,19 +107,23 @@ def build_selection_reply_keyboard() -> ReplyKeyboardMarkup:
         resize_keyboard=True
     )
 
+WELCOME_TEXT = (
+    "Привет! 👋 Я бот для генерации тропарей и кондаков. ☦️\n\n"
+    "<b>Что я умею:</b>\n"
+    "📅 Показываю календарь богослужений.\n"
+    "📖 Загружаю актуальные Богослужебные указания.\n"
+    "📄 Формирую PDF-файл с тропарями и кондаками для Часов.\n"
+    "⚙️ Позволяю выбрать только нужные тексты.\n\n"
+    "Вот актуальный календарь:"
+)
+
 # ─── Обработчики ───
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     await state_manager.clear_state(user_id)
-    text = (
-        "☦️ <b>Тропари и Кондаки на Часах</b>\n\n"
-        "Бот генерирует PDF-документ с тропарями и кондаками\n"
-        "для Часов (1-й, 3-й, 6-й, 9-й) согласно\n"
-        "<b>Богослужебным указаниям</b>.\n\n"
-        "📅 <b>Выберите дату:</b>"
-    )
-    await update.message.reply_text(text, parse_mode="HTML", reply_markup=build_date_keyboard(0))
+    await update.message.reply_text(WELCOME_TEXT, parse_mode="HTML")
+    await update.message.reply_text("📅 <b>Выберите дату:</b>", parse_mode="HTML", reply_markup=build_date_keyboard(0))
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -254,9 +258,8 @@ async def reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if target_date:
         await process_date_selection_text(update, user_id, target_date, user_state)
     else:
-        # Default start behavior if unrecognized and no state
-        if not user_state:
-            await cmd_start(update, context)
+        # Unknown message or unrecognized date
+        await cmd_start(update, context)
 
 async def process_date_selection_text(update: Update, user_id: str, date_str: str, user_state: dict):
     date_human = get_date_human(date_str)

@@ -166,6 +166,16 @@ def build_max_selection_keyboard(pairs: list, selections: dict, date_str: str = 
     
     return builder.as_markup()
 
+WELCOME_TEXT = (
+    "Привет! 👋 Я бот для генерации тропарей и кондаков. ☦️\n\n"
+    "<b>Что я умею:</b>\n"
+    "📅 Показываю календарь богослужений.\n"
+    "📖 Загружаю актуальные Богослужебные указания.\n"
+    "📄 Формирую PDF-файл с тропарями и кондаками для Часов.\n"
+    "⚙️ Позволяю выбрать только нужные тексты.\n\n"
+    "Вот актуальный календарь:"
+)
+
 # ─── Обработчики ───
 
 @dp.message_created(F.message.body.text == "/start")
@@ -173,8 +183,9 @@ async def handle_start(event: MessageCreated):
     logger.info(f"handle_start: user_id={event.message.sender.user_id}")
     user_id = event.message.sender.user_id
     await state_manager.clear_state(str(user_id))
+    await event.message.answer(text=WELCOME_TEXT)
     await event.message.answer(
-         text="☦️ <b>Тропари и Кондаки</b>\n\nВыберите дату:",
+         text="📅 <b>Выберите дату:</b>",
          attachments=[build_max_date_keyboard(0)]
     )
 
@@ -344,6 +355,11 @@ async def handle_generate(event: MessageCallback):
 
     await perform_generate(chat_id, user_id, date_str, user_state)
     await bot.send_callback(callback_id=event.callback.callback_id)
+
+@dp.message_created()
+async def handle_unknown_message(event: MessageCreated):
+    logger.info(f"handle_unknown_message: {event.message.body.text}")
+    await handle_start(event)
 
 @app.post("/webhook/1f7c5225-1f1d-4c0c-b0b8-65a71b304b93")
 async def max_webhook(request: Request, x_max_bot_api_secret: str = Header(None)):
